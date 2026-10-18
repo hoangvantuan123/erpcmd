@@ -1,0 +1,861 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>HERDR — Hệ Thống Điều Hành & Kết Nối Sản Xuất</title>
+  <meta name="description" content="Giao diện phần mềm điều hành sản xuất Herdr đa phân vùng với console câu lệnh và bảng dữ liệu chuyên dụng.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@300;400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="glide-grid.bundle.css">
+</head>
+<body class="theme-dark layout-mode-center">
+  <div id="app" class="app-container">
+    
+    <!-- TOP CUSTOM WINDOW TITLEBAR (FULL LAYOUT HEADER) -->
+    <header class="custom-titlebar" id="custom-titlebar">
+      <!-- DRAG REGION -->
+      <div class="titlebar-drag-region" id="titlebar-drag">
+        <div class="brand-pill">
+          <span class="brand-sym">&gt;_</span>
+          <span class="brand-title">HERDR</span>
+          <span class="brand-sep">|</span>
+          <span class="brand-desc">PRODUCTION WORKSPACE CONNECTOR</span>
+        </div>
+
+        <!-- TELEMETRY BADGES (TEXT ONLY - NO EMOJIS) -->
+        <div class="titlebar-chips">
+          <div class="chip-item">
+            <span class="chip-dot dot-offline" id="chip-poll-dot"></span>
+            <span class="chip-label">AUTO-POLL:</span>
+            <span class="chip-val" id="chip-poll-status">CHỜ LOGIN</span>
+          </div>
+          <div class="chip-item">
+            <span class="chip-label">TOKEN:</span>
+            <span class="chip-val val-dim" id="chip-token-timer">CHƯA CẤP</span>
+          </div>
+          <div class="chip-item" id="chip-machine-wrap">
+            <span class="chip-label">MÁY:</span>
+            <span class="chip-val val-cyan" id="chip-machine-name">DESKTOP-CHS6OSJ</span>
+          </div>
+          <div class="chip-item" id="chip-user-wrap">
+            <span class="chip-label">USER:</span>
+            <span class="chip-val val-dim" id="chip-user-name">[CHƯA ĐĂNG NHẬP]</span>
+          </div>
+        </div>
+
+        <!-- LAYOUT SWITCH BUTTONS -->
+        <div class="layout-switch-group">
+          <span class="layout-label">LAYOUT:</span>
+          <button type="button" class="btn-layout-mode active" data-mode="bottom" id="btn-layout-bottom" title="Bố cục chuẩn 2 phần: Không gian làm việc Bảng Trên / Console Lệnh Dưới">[Bảng Trên / Lệnh Dưới]</button>
+          <button type="button" class="btn-layout-mode" data-mode="center" id="btn-layout-center" title="Bố cục 3 phần: Console dòng lệnh ở Giữa">[Console Giữa]</button>
+          <button type="button" class="btn-layout-mode" data-mode="right" id="btn-layout-right" title="Bố cục 3 phần: Console dòng lệnh ở Phải Cùng">[Console Phải]</button>
+        </div>
+      </div>
+
+      <!-- TITLEBAR RIGHT ACTIONS & WINDOW CONTROLS -->
+      <div class="titlebar-controls">
+        <button type="button" class="btn-top-setting" id="btn-top-setting" title="Mở cửa sổ cấu hình nghiệp vụ &amp; hệ thống (New Window)">[Cài đặt (New Window)]</button>
+        <button type="button" class="btn-logout" id="btn-top-logout" style="display:none;" title="Đăng xuất tài khoản hiện tại">[Đăng xuất]</button>
+        
+        <!-- NATIVE WINDOW BUTTONS (CALLS WIN32 API VIA GO) -->
+        <div class="window-nav-btns">
+          <button type="button" class="win-control-btn" id="win-btn-minimize" title="Thu nhỏ">─</button>
+          <button type="button" class="win-control-btn" id="win-btn-maximize" title="Phóng to / Khôi phục">□</button>
+          <button type="button" class="win-control-btn win-close" id="win-btn-close" title="Đóng ứng dụng">✕</button>
+        </div>
+      </div>
+    </header>
+
+    <!-- MAIN MULTI-PANE WORKSPACE (LAYOUT 2 PHẦN: 1 LÀ SPACES / 2 LÀ KHÔNG GIAN LÀM VIỆC BẢNG TRÊN - LỆNH DƯỚI) -->
+    <div class="workspace-viewport" id="workspace-viewport">
+
+      <!-- PANE 1: SPACES (KHÔNG GIAN LÀM VIỆC & DANH MỤC LỆNH MES) -->
+      <aside class="sidebar-pane" id="sidebar-pane">
+        <div class="sidebar-header">
+          <span>SPACES &amp; PHÂN HỆ LỆNH</span>
+        </div>
+
+        <ul class="mes-menu" id="mes-menu">
+          <li class="menu-entry active" data-screen="screen-wo" id="menu-wo">
+            <div class="entry-main">
+              <span class="entry-tag">[WO]</span>
+              <span class="entry-text">Lệnh công đoạn</span>
+            </div>
+            <span class="entry-badge" id="menu-badge-wo">50</span>
+          </li>
+          <li class="menu-entry" data-screen="screen-wo-detail" id="menu-wo-detail">
+            <div class="entry-main">
+              <span class="entry-tag">[WOD]</span>
+              <span class="entry-text">Chi tiết lệnh C.Đoạn</span>
+            </div>
+            <span class="entry-badge badge-dim">PKV</span>
+          </li>
+          <li class="menu-entry" data-screen="screen-op" id="menu-op">
+            <div class="entry-main">
+              <span class="entry-tag">[OP]</span>
+              <span class="entry-text">Lệnh thao tác SX</span>
+            </div>
+            <span class="entry-badge">24</span>
+          </li>
+          <li class="menu-entry" data-screen="screen-op-detail" id="menu-op-detail">
+            <div class="entry-main">
+              <span class="entry-tag">[OPD]</span>
+              <span class="entry-text">Chi tiết thao tác</span>
+            </div>
+            <span class="entry-badge badge-dim">Steps</span>
+          </li>
+          <li class="menu-entry" data-screen="screen-rolls" id="menu-rolls">
+            <div class="entry-main">
+              <span class="entry-tag">[ROLL]</span>
+              <span class="entry-text">Xử lý tải cuộn</span>
+            </div>
+            <span class="entry-badge badge-amber">12</span>
+          </li>
+          <li class="menu-entry" data-screen="screen-logs" id="menu-logs">
+            <div class="entry-main">
+              <span class="entry-tag">[LOGS]</span>
+              <span class="entry-text">Theo dõi API Logs</span>
+            </div>
+            <span class="entry-badge" id="badge-api-count">50 req</span>
+          </li>
+          <li class="menu-entry" id="menu-open-setting">
+            <div class="entry-main">
+              <span class="entry-tag">[CFG]</span>
+              <span class="entry-text">Cửa sổ Cài đặt</span>
+            </div>
+            <span class="entry-badge badge-dim">New Win</span>
+          </li>
+          <li class="menu-entry" data-screen="screen-auth" id="menu-auth">
+            <div class="entry-main">
+              <span class="entry-tag">[AUTH]</span>
+              <span class="entry-text">Xác thực Token ERP</span>
+            </div>
+            <span class="entry-badge badge-dim">Gateway</span>
+          </li>
+        </ul>
+
+        <div class="sidebar-bottom">
+          <div class="bottom-actions">
+            <button type="button" class="btn-sidebar-act" id="btn-side-poll">[+] Poll ngay</button>
+            <button type="button" class="btn-sidebar-act" id="btn-side-sync">[*] Tải lại dữ liệu</button>
+          </div>
+          <div class="bottom-stat">SQLite: <strong id="stat-db-kb">131 KB</strong></div>
+          <div class="bottom-stat">Bravo: <strong>Cổng 5051 (21ms)</strong></div>
+        </div>
+      </aside>
+
+      <!-- RESIZER 1: SIDEBAR RESIZER -->
+      <div class="pane-resizer resizer-vertical" id="resizer-sidebar" title="Kéo dãn độ rộng sidebar"></div>
+
+      <!-- MAIN WORKSPACE SPLIT (CHỨA CONSOLE & DATA THEO BỐ CỤC 3 LAYOUT) -->
+      <div class="content-split-area" id="content-split-area">
+
+        <!-- PANE 2: INTERACTIVE COMMAND CONSOLE (BỐ CỤC CÂU LỆNH ĐỂ LÀM VIỆC) -->
+        <section class="console-pane" id="console-pane">
+          <div class="pane-tab-header">
+            <div class="header-left">
+              <span class="header-prefix">&gt;_</span>
+              <span class="header-title">CONSOLE ĐIỀU HÀNH &amp; CÂU LỆNH</span>
+            </div>
+            <div class="header-right">
+              <button type="button" class="btn-header-act" id="btn-cli-help" title="Hiển thị bảng trợ giúp lệnh">[Help]</button>
+              <button type="button" class="btn-header-act" id="btn-cli-clear" title="Xóa màn hình console">[Clear]</button>
+            </div>
+          </div>
+
+          <!-- CLI TERMINAL SCREEN OUTPUT -->
+          <div class="terminal-screen" id="terminal-screen">
+            <div class="term-line line-brand">HERDR TERMINAL [v10.9.5.1] — MÁY TRẠM: <span id="cli-host-label" class="val-cyan">DESKTOP-CHS6OSJ</span></div>
+            <div class="term-line line-dim">Hệ thống điều hành sản xuất chuyên dụng Herdr | CSDL: messyn_data.db</div>
+            <div class="term-line line-dim">Trạng thái phiên: <span class="val-amber" id="cli-auth-status">CHƯA ĐĂNG NHẬP</span> | Chờ kết nối Gateway</div>
+            <div class="term-line line-dim">Vui lòng đăng nhập tài khoản tại phân vùng [AUTH] hoặc dùng lệnh: <span class="term-highlight">/login</span></div>
+            <div class="term-line line-dim">Gõ <span class="term-highlight">/help</span> để xem bảng danh mục câu lệnh điều hành hệ thống.</div>
+            <div class="term-line line-divider">─────────────────────────────────────────────────────────────────────────────────</div>
+          </div>
+
+          <!-- AUTOCOMPLETE DROPDOWN (GỢI Ý KHI GÕ /) -->
+          <div class="autocomplete-dropdown" id="autocomplete-dropdown" style="display: none;">
+            <!-- Rendered dynamically -->
+          </div>
+
+          <!-- CLI INPUT ROW -->
+          <div class="terminal-input-bar">
+            <span class="term-prompt" id="term-prompt-label">herdr [DESKTOP-CHS6OSJ] ❯</span>
+            <input type="text" id="term-cmd-input" placeholder="Gõ câu lệnh (/help, /wo, /login, /token, /poll now...)" autocomplete="off" spellcheck="false">
+            <button type="button" class="btn-term-run" id="btn-term-run">Chạy ↵</button>
+          </div>
+        </section>
+
+        <!-- RESIZER 2: CONSOLE TO DATA RESIZER (HORIZONTAL HOẶC VERTICAL TÙY CHẾ ĐỘ) -->
+        <div class="pane-resizer resizer-vertical" id="resizer-content" title="Kéo dãn độ rộng phân vùng"></div>
+
+        <!-- PANE 3: DATA PANE (BẢNG DỮ LIỆU SẢN XUẤT MES TRỰC QUAN) -->
+        <section class="data-pane" id="data-pane">
+          
+          <!-- SCREEN 1: LỆNH CÔNG ĐOẠN (21 CỘT CHUẨN MES THEO YÊU CẦU) -->
+          <div class="data-view active" id="screen-wo">
+            <div class="data-view-header">
+              <div class="view-title">[WO] LỆNH CÔNG ĐOẠN (vB30WorkProcess_Explorer)</div>
+              <div class="view-actions">
+                <div class="grid-engine-selector" style="display: inline-flex; align-items: center; gap: 4px; background: #161b22; padding: 2px 6px; border: 1px solid #30363d; border-radius: 4px; margin-right: 6px;">
+                  <span style="font-size: 10px; color: #8a9ba8; font-weight: 600;">Engine:</span>
+                  <button type="button" class="btn-engine active" id="btn-engine-glide" style="background: #2d72d2; color: #fff; border: none; font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 2px; cursor: pointer;">Canvas (Glide)</button>
+                  <button type="button" class="btn-engine" id="btn-engine-dom" style="background: transparent; color: #8a9ba8; border: none; font-size: 10px; font-weight: 600; padding: 2px 6px; border-radius: 2px; cursor: pointer;">DOM (Classic)</button>
+                </div>
+                <button type="button" class="btn-view-tool" id="btn-toggle-col-settings" title="Cấu hình ẩn / hiện các cột hiển thị">[Cấu hình cột (21)]</button>
+                <button type="button" class="btn-view-tool" id="btn-refresh-wo">[*] Tải lại</button>
+                <button type="button" class="btn-view-tool" id="btn-export-wo">[+] Xuất Excel</button>
+              </div>
+            </div>
+
+            <!-- FLAT PANEL CẤU HÌNH ẨN / HIỆN CỘT -->
+            <div class="column-settings-panel" id="col-settings-panel" style="display: none;">
+              <div class="csp-header">
+                <span class="csp-title">[CẤU HÌNH ẨN / HIỆN 21 CỘT LỆNH CÔNG ĐOẠN]</span>
+                <button type="button" class="btn-csp-close" id="btn-close-col-settings">✕</button>
+              </div>
+              <div class="csp-body">
+                <div class="csp-chips">
+                  <label class="col-toggle-label"><input type="checkbox" data-col="col-lenh" checked> Lệnh công đoạn</label>
+                  <label class="col-toggle-label"><input type="checkbox" data-col="col-mathang" checked> Mặt hàng</label>
+                  <label class="col-toggle-label"><input type="checkbox" data-col="col-tenvattu" checked> Tên vật tư, hàng hóa</label>
+                  <label class="col-toggle-label"><input type="checkbox" data-col="col-sldo" checked> SL cần đạt theo DO</label>
+                  <label class="col-toggle-label"><input type="checkbox" data-col="col-sldcbd" checked> SL điều chỉnh ban đầu</label>
+                  <label class="col-toggle-label"><input type="checkbox" data-col="col-sldcsau" checked> SL cần đạt sau Đ/C</label>
+                  <label class="col-toggle-label"><input type="checkbox" data-col="col-slbuhao" checked> SL bù hao</label>
+                  <label class="col-toggle-label"><input type="checkbox" data-col="col-slcansx" checked> SL cần sản xuất</label>
+                  <label class="col-toggle-label"><input type="checkbox" data-col="col-qtcd" checked> Quyết toán theo lệnh CĐ</label>
+                  <label class="col-toggle-label"><input type="checkbox" data-col="col-slqt" checked> SL quyết toán</label>
+                  <label class="col-toggle-label"><input type="checkbox" data-col="col-sochitiet" checked> Số chi tiết</label>
+                  <label class="col-toggle-label"><input type="checkbox" data-col="col-matt" checked> Mã TT</label>
+                  <label class="col-toggle-label"><input type="checkbox" data-col="col-sldat-tt" checked> SL đạt lên lệnh TT</label>
+                  <label class="col-toggle-label"><input type="checkbox" data-col="col-slsx-tt" checked> SL SX lên lệnh TT</label>
+                  <label class="col-toggle-label"><input type="checkbox" data-col="col-sldat-tk" checked> Số lượng đạt đã thống kê</label>
+                  <label class="col-toggle-label"><input type="checkbox" data-col="col-slsx-tk" checked> Số lượng SX đã thống kê</label>
+                  <label class="col-toggle-label"><input type="checkbox" data-col="col-qttt" checked> Quyết toán theo lệnh TT</label>
+                  <label class="col-toggle-label"><input type="checkbox" data-col="col-slnhapkho" checked> Số lượng Nhập kho</label>
+                  <label class="col-toggle-label"><input type="checkbox" data-col="col-trangthai" checked> Trạng thái</label>
+                  <label class="col-toggle-label"><input type="checkbox" data-col="col-ngayqt" checked> Ngày quyết toán lệnh</label>
+                  <label class="col-toggle-label"><input type="checkbox" data-col="col-ghichu" checked> Ghi chú quyết toán lệnh</label>
+                </div>
+              </div>
+              <div class="csp-footer">
+                <button type="button" class="btn-csp-action" id="btn-csp-all">[Hiện tất cả 21 cột]</button>
+                <button type="button" class="btn-csp-action" id="btn-csp-reset">[Khôi phục mặc định]</button>
+              </div>
+            </div>
+
+            <div class="data-filter-bar">
+              <div class="filter-search-box">
+                <span class="search-prefix">&gt;</span>
+                <input type="text" id="wo-search-input" placeholder="Tìm theo Lệnh CĐ, Mặt hàng, Tên vật tư... (hoặc dán nhiều mã)" autocomplete="off">
+                <button type="button" class="btn-batch-search-modal" id="btn-open-batch-search" title="Mở hộp tìm kiếm nhiều mã lệnh công đoạn cùng lúc (truy vấn Gateway)">[Tìm nhiều mã CĐ]</button>
+              </div>
+              <div class="filter-tags">
+                <button type="button" class="ftag active" data-filter="all">Tất cả</button>
+                <button type="button" class="ftag" data-filter="done">Đã quyết toán</button>
+                <button type="button" class="ftag" data-filter="completed">Đã hoàn thiện</button>
+                <button type="button" class="ftag" data-filter="working">Đang sản xuất</button>
+                <button type="button" class="ftag" data-filter="pending">Chờ thực hiện</button>
+              </div>
+              <div class="table-stats-pill">
+                <span>Trang (pnb): <strong id="pnb-indicator">0</strong></span>
+                <span class="sep">|</span>
+                <span>Đã nạp: <strong id="total-loaded-count">0</strong> dòng</span>
+              </div>
+            </div>
+
+            <!-- MODAL / POPUP TÌM NHIỀU MÃ LỆNH CÔNG ĐOẠN CÙNG LÚC -->
+            <div class="batch-search-popup" id="batch-search-popup" style="display: none; position: absolute; top: 75px; left: 14px; z-index: 150; width: 540px; background: #0f172a; border: 1px solid var(--border-color); box-shadow: 0 8px 24px rgba(0,0,0,0.6); padding: 12px; font-family: var(--font-mono);">
+              <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 6px; margin-bottom: 8px;">
+                <span style="color: var(--term-bright-yellow); font-weight: 800; font-size: 11px;">[TÌM KIẾM NHIỀU MÃ LỆNH CÔNG ĐOẠN CÙNG LÚC]</span>
+                <button type="button" id="btn-close-batch-search" style="background: transparent; border: none; color: #fff; font-size: 12px; cursor: pointer;">[X]</button>
+              </div>
+              <div style="font-size: 10px; color: var(--text-dim); margin-bottom: 6px;">
+                Dán danh sách các mã lệnh công đoạn (mỗi mã 1 dòng hoặc cách nhau bởi dấu phẩy/khoảng trắng):
+              </div>
+              <textarea id="batch-search-textarea" rows="8" placeholder="CDSO-1026-0005(650)&#10;CD02-0926-0112(450)&#10;CD01-0926-0088(320)&#10;CD05-0926-0310(560)&#10;CDSO-1026-0007(980)&#10;CDRE-1026-0017(890)..." style="width: 100%; background: #0a0f1d; border: 1px solid var(--border-color); color: var(--term-bright-white); padding: 6px; font-family: var(--font-mono); font-size: 11px; resize: vertical; outline: none;"></textarea>
+              <div style="margin-top: 8px; display: flex; justify-content: space-between; align-items: center;">
+                <span id="batch-search-count-label" style="font-size: 10px; color: var(--term-bright-cyan); font-weight: 700;">Đã nhận diện: 0 mã lệnh</span>
+                <div style="display: flex; gap: 8px;">
+                  <button type="button" id="btn-batch-search-sample" style="background: #1e293b; color: #ccc; border: 1px solid #334155; font-size: 10px; padding: 3px 8px; cursor: pointer;">[Điền mẫu 10 mã]</button>
+                  <button type="button" id="btn-batch-search-submit" style="background: var(--term-bright-blue); color: #fff; border: none; font-size: 11px; font-weight: 800; padding: 4px 12px; cursor: pointer;">[Truy vấn API]</button>
+                </div>
+              </div>
+            </div>
+
+            <!-- BLUEPRINT BATCH SELECTION & ACTION BAR -->
+            <div class="bp-selection-bar" id="bp-selection-bar" style="display: none;">
+              <div class="bp-bar-left">
+                <span class="bp-bar-icon">[v]</span>
+                <span class="bp-selected-info"><strong id="bp-selected-count">0</strong> lệnh đã chọn</span>
+              </div>
+              <div class="bp-bar-actions">
+                <button type="button" class="bp-btn bp-btn-primary" id="bp-btn-settle-selected" title="Đánh dấu quyết toán cho các dòng đã tích chọn">
+                  [Tích Quyết toán]
+                </button>
+                <button type="button" class="bp-btn bp-btn-info" id="bp-btn-fill-sx" title="Tự động gán SL quyết toán = SL cần sản xuất">
+                  [Điền = SL Cần SX]
+                </button>
+                <button type="button" class="bp-btn bp-btn-warning" id="bp-btn-unsettle-selected" title="Hủy quyết toán các lệnh đã chọn">
+                  [Hủy quyết toán]
+                </button>
+                <button type="button" class="bp-btn bp-btn-success" id="bp-btn-save-db" title="Lưu thay đổi quyết toán trực tiếp vào CSDL SQLite">
+                  [Lưu vào CSDL]
+                </button>
+                <button type="button" class="bp-btn bp-btn-minimal" id="bp-btn-clear-selection" title="Bỏ chọn tất cả">
+                  [Bỏ chọn]
+                </button>
+              </div>
+              <div class="bp-bar-status" id="bp-bar-status"></div>
+            </div>
+
+            <!-- GLIDE DATA GRID HIGH-PERFORMANCE CANVAS CONTAINER -->
+            <div id="wo-glide-container" style="flex: 1; width: 100%; height: 100%; min-height: 420px; position: relative;"></div>
+
+            <div class="table-scroll-area" id="wo-table-scroll" style="display: none;">
+              <table class="data-grid-table table-lenh-cong-doan bp-table" id="table-wo">
+                <thead>
+                  <tr>
+                    <th class="col-select bp-col-select" style="width: 36px; text-align: center;">
+                      <input type="checkbox" id="th-select-all" class="bp-checkbox" title="Chọn / Bỏ chọn tất cả">
+                    </th>
+                    <th class="col-stt" style="width: 38px; text-align: center;">STT</th>
+                    <th class="col-lenh">Lệnh công đoạn</th>
+                    <th class="col-mathang">Mặt hàng</th>
+                    <th class="col-tenvattu">Tên vật tư, hàng hóa</th>
+                    <th class="col-sldo" style="text-align: right;">SL cần đạt theo DO</th>
+                    <th class="col-sldcbd" style="text-align: right;">SL điều chỉnh ban đầu</th>
+                    <th class="col-sldcsau" style="text-align: right;">SL cần đạt sau điều chỉnh</th>
+                    <th class="col-slbuhao" style="text-align: right;">SL bù hao</th>
+                    <th class="col-slcansx" style="text-align: right;">SL cần sản xuất</th>
+                    <th class="col-qtcd" style="text-align: center;">Quyết toán theo lệnh CĐ</th>
+                    <th class="col-slqt" style="text-align: right;">SL quyết toán</th>
+                    <th class="col-sochitiet">Số chi tiết</th>
+                    <th class="col-matt">Mã TT</th>
+                    <th class="col-sldat-tt" style="text-align: right;">SL đạt đã lên lệnh TT</th>
+                    <th class="col-slsx-tt" style="text-align: right;">SL sản xuất đã lên lệnh TT</th>
+                    <th class="col-sldat-tk" style="text-align: right;">Số lượng đạt đã thống kê</th>
+                    <th class="col-slsx-tk" style="text-align: right;">Số lượng SX đã thống kê</th>
+                    <th class="col-qttt" style="text-align: center;">Quyết toán theo lệnh TT</th>
+                    <th class="col-slnhapkho" style="text-align: right;">Số lượng Nhập kho</th>
+                    <th class="col-trangthai">Trạng thái</th>
+                    <th class="col-ngayqt">Ngày quyết toán lệnh</th>
+                    <th class="col-ghichu">Ghi chú quyết toán lệnh</th>
+                  </tr>
+                </thead>
+                <tbody id="tbody-wo">
+                  <!-- Dynamically rendered -->
+                </tbody>
+              </table>
+              <div class="scroll-loading-bar" id="scroll-loading-bar" style="display: none;">
+                <span class="slb-spinner"></span>
+                <span>Đang cuộn tải trang tiếp theo (pnb: <span id="loading-pnb-num">1</span>) từ Bravo ERP Gateway...</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- SCREEN 2: CHI TIẾT LỆNH CÔNG ĐOẠN -->
+          <div class="data-view" id="screen-wo-detail" style="display: none;">
+            <div class="data-view-header">
+              <div class="view-title">[WOD] CHI TIẾT LỆNH CÔNG ĐOẠN (vB30WorkProcessDetail_Explorer)</div>
+              <span class="active-item-badge" id="detail-active-pkv">PKV: 11114889CD</span>
+            </div>
+
+            <div class="summary-info-bar">
+              <div class="info-cell">
+                <span class="ic-label">Số Lệnh:</span>
+                <span class="ic-val" id="det-doc-no">CD02-0626-0630</span>
+              </div>
+              <div class="info-cell">
+                <span class="ic-label">Công đoạn:</span>
+                <span class="ic-val val-cyan" id="det-process">CD02 (In Offset)</span>
+              </div>
+              <div class="info-cell">
+                <span class="ic-label">Sản phẩm:</span>
+                <span class="ic-val" id="det-product">Hộp Carton sóng E 3 lớp Goldsun</span>
+              </div>
+              <div class="info-cell">
+                <span class="ic-label">Tiến độ:</span>
+                <span class="ic-val val-mint" id="det-progress">77%</span>
+              </div>
+            </div>
+
+            <div class="table-scroll-area">
+              <table class="data-grid-table" id="table-wo-detail">
+                <thead>
+                  <tr>
+                    <th>Mã chi tiết</th>
+                    <th>Mã NVL / Bán thành phẩm</th>
+                    <th>Tên vật tư chi tiết</th>
+                    <th>ĐVT</th>
+                    <th>SL Đơn hàng (SO)</th>
+                    <th>SL Cấp phát</th>
+                    <th>SL Đạt</th>
+                    <th>SL Điều chỉnh</th>
+                    <th>SL Sản xuất</th>
+                    <th>Tỷ lệ hoàn thành</th>
+                    <th>Ngày giao hàng</th>
+                  </tr>
+                </thead>
+                <tbody id="tbody-wo-detail">
+                  <!-- Dynamically rendered -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- SCREEN 3: LỆNH THAO TÁC SẢN XUẤT -->
+          <div class="data-view" id="screen-op" style="display: none;">
+            <div class="data-view-header">
+              <div class="view-title">[OP] LỆNH THAO TÁC SẢN XUẤT (VẬN HÀNH DÂY CHUYỀN MÁY)</div>
+              <button type="button" class="btn-view-tool" id="btn-add-op">[+] Thêm lệnh máy</button>
+            </div>
+
+            <div class="kpi-ribbon">
+              <div class="kpi-box">
+                <div class="kpi-num">24</div>
+                <div class="kpi-title">Tổng Lệnh Máy</div>
+              </div>
+              <div class="kpi-box box-active">
+                <div class="kpi-num val-mint">8</div>
+                <div class="kpi-title">Đang Vận Hành</div>
+              </div>
+              <div class="kpi-box">
+                <div class="kpi-num val-amber">14</div>
+                <div class="kpi-title">Chờ Ca Tiếp Theo</div>
+              </div>
+              <div class="kpi-box">
+                <div class="kpi-num val-red">2</div>
+                <div class="kpi-title">Dừng Bảo Trì</div>
+              </div>
+            </div>
+
+            <div class="table-scroll-area">
+              <table class="data-grid-table" id="table-op">
+                <thead>
+                  <tr>
+                    <th>Lệnh Thao Tác</th>
+                    <th>Lệnh SX liên kết</th>
+                    <th>Thiết bị / Dây chuyền máy</th>
+                    <th>Công đoạn thao tác</th>
+                    <th>Ca sản xuất</th>
+                    <th>Trưởng ca vận hành</th>
+                    <th>Bắt đầu</th>
+                    <th>Sản lượng đạt</th>
+                    <th>Phế phẩm (kg)</th>
+                    <th>Trạng thái máy</th>
+                    <th>Thao tác</th>
+                  </tr>
+                </thead>
+                <tbody id="tbody-op">
+                  <!-- Dynamically rendered -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- SCREEN 4: CHI TIẾT THAO TÁC SẢN XUẤT -->
+          <div class="data-view" id="screen-op-detail" style="display: none;">
+            <div class="data-view-header">
+              <div class="view-title">[OPD] CHI TIẾT BƯỚC THAO TÁC MÁY &amp; THÔNG SỐ KỸ THUẬT</div>
+              <span class="active-item-badge" id="opdet-no">TT-CD02-2601</span>
+            </div>
+
+            <div class="summary-info-bar">
+              <div class="info-cell">
+                <span class="ic-label">Thiết bị máy:</span>
+                <span class="ic-val" id="opdet-machine">Dây chuyền máy sóng 5 lớp 2.2m (S01)</span>
+              </div>
+              <div class="info-cell">
+                <span class="ic-label">Ca kíp:</span>
+                <span class="ic-val" id="opdet-shift">Ca 1 (06:00 - 14:00)</span>
+              </div>
+              <div class="info-cell">
+                <span class="ic-label">Tổ trưởng:</span>
+                <span class="ic-val val-cyan" id="opdet-operator">HOÀNG VĂN TUẤN</span>
+              </div>
+            </div>
+
+            <div class="table-scroll-area">
+              <table class="data-grid-table" id="table-op-detail">
+                <thead>
+                  <tr>
+                    <th>Bước</th>
+                    <th>Nội dung thao tác máy</th>
+                    <th>Tốc độ (m/phút)</th>
+                    <th>Nhiệt độ / Áp lực</th>
+                    <th>Công nhân phụ trách</th>
+                    <th>Chỉ số kiểm soát QC</th>
+                    <th>Dừng máy</th>
+                    <th>Đánh giá chất lượng</th>
+                  </tr>
+                </thead>
+                <tbody id="tbody-op-detail">
+                  <!-- Dynamically rendered -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- SCREEN 5: XỬ LÝ TẢI CUỘN (ROLL LOADING) -->
+          <div class="data-view" id="screen-rolls" style="display: none;">
+            <div class="data-view-header">
+              <div class="view-title">[ROLL] XỬ LÝ TẢI CUỘN &amp; QUẢN LÝ CUỘN GIẤY DÀN SÓNG</div>
+              <div class="view-actions">
+                <button type="button" class="btn-view-tool" id="btn-load-new-roll">[+] Tải cuộn mới</button>
+                <button type="button" class="btn-view-tool" id="btn-unload-roll">[-] Hạ cuộn trả kho</button>
+              </div>
+            </div>
+
+            <!-- 5 VISUAL ROLL STANDS (DÀN TRỤC CẤP CUỘN MÁY SÓNG GOLDSUN) -->
+            <div class="roll-stands-strip">
+              <div class="stand-panel">
+                <div class="sp-head">
+                  <span class="sp-name">TRỤC 1 (MẶT ĐÁY)</span>
+                  <span class="sp-badge badge-mint">[RUN]</span>
+                </div>
+                <div class="sp-roll-id">ROLL-KF-175-0891</div>
+                <div class="sp-desc">Kraft Mộc A 175g | Khổ 1400</div>
+                <div class="sp-meter"><div class="sp-fill" style="width: 72%;"></div></div>
+                <div class="sp-weight">Còn: <strong>890 kg</strong> / 1,250 kg (72%)</div>
+                <div class="sp-btns">
+                  <button type="button" class="btn-sp">[Thay cuộn]</button>
+                  <button type="button" class="btn-sp">[Xả cuộn]</button>
+                </div>
+              </div>
+
+              <div class="stand-panel">
+                <div class="sp-head">
+                  <span class="sp-name">TRỤC 2 (SÓNG B)</span>
+                  <span class="sp-badge badge-mint">[RUN]</span>
+                </div>
+                <div class="sp-roll-id">ROLL-MD-125-0442</div>
+                <div class="sp-desc">Medium sóng 125g | Khổ 1400</div>
+                <div class="sp-meter"><div class="sp-fill" style="width: 45%;"></div></div>
+                <div class="sp-weight">Còn: <strong>410 kg</strong> / 920 kg (45%)</div>
+                <div class="sp-btns">
+                  <button type="button" class="btn-sp">[Thay cuộn]</button>
+                  <button type="button" class="btn-sp">[Xả cuộn]</button>
+                </div>
+              </div>
+
+              <div class="stand-panel">
+                <div class="sp-head">
+                  <span class="sp-name">TRỤC 3 (MẶT GIỮA)</span>
+                  <span class="sp-badge badge-mint">[RUN]</span>
+                </div>
+                <div class="sp-roll-id">ROLL-KF-150-1012</div>
+                <div class="sp-desc">Kraft Lót 150g | Khổ 1400</div>
+                <div class="sp-meter"><div class="sp-fill" style="width: 88%;"></div></div>
+                <div class="sp-weight">Còn: <strong>1,120 kg</strong> / 1,280 kg (88%)</div>
+                <div class="sp-btns">
+                  <button type="button" class="btn-sp">[Thay cuộn]</button>
+                  <button type="button" class="btn-sp">[Xả cuộn]</button>
+                </div>
+              </div>
+
+              <div class="stand-panel stand-danger">
+                <div class="sp-head">
+                  <span class="sp-name">TRỤC 4 (SÓNG E)</span>
+                  <span class="sp-badge badge-red">[CẢNH BÁO]</span>
+                </div>
+                <div class="sp-roll-id val-red">ROLL-MD-110-0219</div>
+                <div class="sp-desc">Medium sóng E 110g | Khổ 1400</div>
+                <div class="sp-meter"><div class="sp-fill fill-red" style="width: 15%;"></div></div>
+                <div class="sp-weight val-red">Còn: <strong>115 kg</strong> (SẮP HẾT)</div>
+                <div class="sp-btns">
+                  <button type="button" class="btn-sp btn-alert">[Nối cuộn khẩn]</button>
+                  <button type="button" class="btn-sp">[Lấy cuộn chờ]</button>
+                </div>
+              </div>
+
+              <div class="stand-panel">
+                <div class="sp-head">
+                  <span class="sp-name">TRỤC 5 (MẶT NGOÀI)</span>
+                  <span class="sp-badge badge-mint">[RUN]</span>
+                </div>
+                <div class="sp-roll-id">ROLL-DX-250-0988</div>
+                <div class="sp-desc">Duplex xám 250g | Khổ 1400</div>
+                <div class="sp-meter"><div class="sp-fill" style="width: 60%;"></div></div>
+                <div class="sp-weight">Còn: <strong>950 kg</strong> / 1,580 kg (60%)</div>
+                <div class="sp-btns">
+                  <button type="button" class="btn-sp">[Thay cuộn]</button>
+                  <button type="button" class="btn-sp">[Xả cuộn]</button>
+                </div>
+              </div>
+            </div>
+
+            <!-- GLIDE DATA GRID HIGH-PERFORMANCE CANVAS CONTAINER FOR ROLLS -->
+            <div id="rolls-glide-container" style="flex: 1; width: 100%; height: 320px; min-height: 260px; position: relative;"></div>
+
+            <div class="table-scroll-area" id="rolls-table-scroll" style="display: none;">
+              <table class="data-grid-table" id="table-rolls">
+                <thead>
+                  <tr>
+                    <th>Mã Cuộn (Roll ID)</th>
+                    <th>Vị trí trục cấp</th>
+                    <th>Loại giấy</th>
+                    <th>Khổ (mm)</th>
+                    <th>Định lượng</th>
+                    <th>Khối lượng ban đầu</th>
+                    <th>Đã xả</th>
+                    <th>Còn lại</th>
+                    <th>Trạng thái cuộn</th>
+                    <th>Thời gian lên giàn</th>
+                    <th>Thao tác</th>
+                  </tr>
+                </thead>
+                <tbody id="tbody-rolls">
+                  <!-- Dynamically rendered -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- SCREEN 6: MÀN HÌNH XÁC THỰC & KẾT NỐI BRAVO ERP (FLAT SCREEN - HOÀN TOÀN KHÔNG DÙNG MODAL) -->
+          <div class="data-view" id="screen-auth">
+            <div class="data-view-header">
+              <div class="view-title">[AUTH] XÁC THỰC &amp; CẤU HÌNH KẾT NỐI BRAVO ERP GATEWAY (MÀN HÌNH PHẲNG)</div>
+              <div class="view-actions">
+                <button type="button" class="btn-view-tool" id="btn-auth-poll">[+] Kiểm tra kết nối</button>
+                <button type="button" class="btn-view-tool" id="btn-auth-refresh-token">[*] Làm mới Token</button>
+                <button type="button" class="btn-view-tool" id="btn-auth-save">[✓] Xác thực tài khoản</button>
+              </div>
+            </div>
+
+            <div class="auth-flat-viewport">
+              <div class="auth-grid-tiled">
+
+                <!-- TILED PANEL 1: FORM CẤU HÌNH TÀI KHOẢN ERP -->
+                <div class="auth-card-panel">
+                  <div class="acp-header">
+                    <span class="acp-tag">[01]</span>
+                    <span class="acp-title">THÔNG TIN MÁY TRẠM &amp; TÀI KHOẢN BRAVO ERP</span>
+                  </div>
+                  <div class="acp-body">
+                    <div class="afg-field afg-twin">
+                      <div>
+                        <label>Tên máy trạm (Machine Host):</label>
+                        <input type="text" id="flat-auth-hostname" value="DESKTOP-CHS6OSJ" disabled style="color: var(--accent-cyan); font-weight: 700;">
+                      </div>
+                      <div>
+                        <label>Tài khoản người dùng (Username):</label>
+                        <input type="text" id="flat-auth-username" value="it_tuanhv" spellcheck="false">
+                      </div>
+                    </div>
+                    <div class="afg-field">
+                      <label>Mật khẩu xác thực (Password):</label>
+                      <input type="password" id="flat-auth-password" value="Tuan@123" spellcheck="false">
+                    </div>
+                    <div class="afg-field">
+                      <label>Địa chỉ Máy chủ Bravo Gateway:</label>
+                      <input type="text" id="flat-auth-gateway" value="https://bravo.goldsunpackaging.vn:5051" spellcheck="false">
+                    </div>
+                    <div class="afg-field">
+                      <label>Chế độ kết nối Client:</label>
+                      <select id="flat-auth-client-mode">
+                        <option value="winform" selected>Winform Native (B10.10.9.1.1)</option>
+                        <option value="web">Bravo Web Client (10.9.5.1)</option>
+                        <option value="direct">Direct REST API Bridge</option>
+                      </select>
+                    </div>
+                    <div class="afg-field afg-twin">
+                      <div>
+                        <label>Đơn vị / Chi nhánh:</label>
+                        <input type="text" value="A01 (Goldsun BN)" disabled>
+                      </div>
+                      <div>
+                        <label>Năm tài chính:</label>
+                        <input type="text" value="2026" disabled>
+                      </div>
+                    </div>
+
+                    <div class="acp-footer-actions">
+                      <button type="button" class="btn-flat-auth primary" id="btn-flat-auth-submit">[XÁC THỰC &amp; CẤP MỚI TOKEN]</button>
+                      <button type="button" class="btn-flat-auth" id="btn-flat-auth-reset">[Khôi phục mặc định]</button>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- TILED PANEL 2: GIÁM SÁT OAUTH2 TOKEN THỜI GIAN THỰC -->
+                <div class="auth-card-panel">
+                  <div class="acp-header">
+                    <span class="acp-tag">[02]</span>
+                    <span class="acp-title">GIÁM SÁT OAUTH2 BEARER TOKEN THỜI GIAN THỰC</span>
+                    <span class="token-status-indicator" id="flat-token-status-pill" style="color: var(--accent-amber); border-color: var(--accent-amber);">● CHỜ XÁC THỰC</span>
+                  </div>
+                  <div class="acp-body">
+                    <div class="token-timer-bar">
+                      <div class="ttb-row">
+                        <span class="ttb-label">Thời hạn Bearer Token còn lại:</span>
+                        <span class="ttb-val" id="flat-token-countdown">Chưa cấp Token</span>
+                      </div>
+                      <div class="ttb-track">
+                        <div class="ttb-fill" id="flat-token-progress" style="width: 0%;"></div>
+                      </div>
+                    </div>
+
+                    <div class="token-box-container">
+                      <div class="tbc-header">
+                        <span>Authorization: Bearer &lt;Token&gt;</span>
+                        <button type="button" class="btn-copy-token" id="btn-copy-token">[Sao chép Token]</button>
+                      </div>
+                      <textarea class="token-raw-box" id="flat-token-string" readonly spellcheck="false" placeholder="Token sẽ được tạo sau khi nhấn [XÁC THỰC &amp; CẤP MỚI TOKEN]..."></textarea>
+                    </div>
+
+                    <div class="token-specs-grid">
+                      <div class="spec-row"><span class="sk">Thuật toán:</span><span class="sv">RS256 (RSA 2048-bit)</span></div>
+                      <div class="spec-row"><span class="sk">Máy trạm kết nối:</span><span class="sv val-cyan" id="flat-spec-host">DESKTOP-CHS6OSJ</span></div>
+                      <div class="spec-row"><span class="sk">Tài khoản xác thực:</span><span class="sv val-amber" id="flat-spec-user">[Chưa xác thực]</span></div>
+                      <div class="spec-row"><span class="sk">Thời điểm cấp:</span><span class="sv" id="flat-spec-issued">Chưa cấp</span></div>
+                      <div class="spec-row"><span class="sk">Thời điểm hết hạn:</span><span class="sv val-amber" id="flat-spec-expiry">Chưa cấp</span></div>
+                    </div>
+                  </div>
+                </div>
+
+              </div>
+
+              <!-- TILED PANEL 3: TRẠNG THÁI DIAGNOSTIC & LOGS KẾT NỐI -->
+              <div class="auth-card-panel full-span">
+                <div class="acp-header">
+                  <span class="acp-tag">[03]</span>
+                  <span class="acp-title">TRẠNG THÁI KẾT NỐI CSDL SQLITE &amp; NHẬT KÝ ĐỒNG BỘ GATEWAY</span>
+                </div>
+                <div class="acp-body">
+                  <div class="gateway-metrics-bar">
+                    <div class="gmb-item">
+                      <span class="gmb-lbl">BRAVO GATEWAY:</span>
+                      <span class="gmb-val val-mint">ONLINE (200 OK)</span>
+                    </div>
+                    <div class="gmb-item">
+                      <span class="gmb-lbl">CỔNG TRUYỀN DẪN:</span>
+                      <span class="gmb-val">5051 (HTTPS SSL)</span>
+                    </div>
+                    <div class="gmb-item">
+                      <span class="gmb-lbl">ĐỘ TRỄ LATENCY:</span>
+                      <span class="gmb-val val-cyan" id="flat-diag-latency">21 ms</span>
+                    </div>
+                    <div class="gmb-item">
+                      <span class="gmb-lbl">CHU KỲ AUTO-POLL:</span>
+                      <span class="gmb-val val-amber">ACTIVE (5 phút)</span>
+                    </div>
+                    <div class="gmb-item">
+                      <span class="gmb-lbl">CSDL CỤC BỘ:</span>
+                      <span class="gmb-val">messyn_data.db (131 KB)</span>
+                    </div>
+                    <div class="gmb-item">
+                      <span class="gmb-lbl">LỆNH SX TRONG DB:</span>
+                      <span class="gmb-val val-purple" id="flat-diag-wo-count">50 lệnh</span>
+                    </div>
+                  </div>
+
+                  <div class="table-scroll-area" style="max-height: 220px;">
+                    <table class="data-grid-table">
+                      <thead>
+                        <tr>
+                          <th>Thời gian</th>
+                          <th>Phương thức</th>
+                          <th>Endpoint API Bravo</th>
+                          <th>Mã HTTP</th>
+                          <th>Độ trễ</th>
+                          <th>Kết quả phản hồi</th>
+                        </tr>
+                      </thead>
+                      <tbody id="tbody-auth-logs">
+                        <!-- Rendered dynamically -->
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+
+            </div>
+          </div>
+
+          <!-- SCREEN 7: MÀN HÌNH THEO DÕI LOGS CÁC ĐẦU API ĐÃ GỌI (FLAT SCREEN) -->
+          <div class="data-view" id="screen-logs">
+            <div class="data-view-header">
+              <div class="view-title">[LOGS] NHẬT KÝ THEO DÕI CÁC ĐẦU API ĐÃ GỌI (GIÁM SÁT THÀNH CÔNG &amp; LỖI)</div>
+              <div class="view-actions">
+                <button type="button" class="btn-view-tool" id="btn-test-api-ok" title="Gửi request mẫu thành công HTTP 200">[+] Test API 200 OK</button>
+                <button type="button" class="btn-view-tool" id="btn-test-api-err" title="Gửi request mẫu lỗi HTTP 401">[!] Test API Lỗi 401</button>
+                <button type="button" class="btn-view-tool" id="btn-refresh-logs" title="Tải lại nhật ký API">[*] Tải lại logs</button>
+                <button type="button" class="btn-view-tool" id="btn-clear-logs" title="Xóa toàn bộ nhật ký API">[✕] Xóa logs</button>
+              </div>
+            </div>
+
+            <!-- SEARCH, FILTERS & METRICS BAR -->
+            <div class="filter-toolbar">
+              <div class="search-box">
+                <span class="search-icon">&gt;</span>
+                <input type="text" id="logs-search-input" placeholder="Lọc theo endpoint API, phương thức (POST/GET), nội dung phản hồi..." spellcheck="false">
+              </div>
+              <div class="filter-tags">
+                <button type="button" class="ftag-log active" data-filter="all">[TẤT CẢ (<span id="count-log-all">0</span>)]</button>
+                <button type="button" class="ftag-log" data-filter="success">[THÀNH CÔNG 200 OK (<span id="count-log-success">0</span>)]</button>
+                <button type="button" class="ftag-log" data-filter="error">[LỖI / THẤT BẠI (<span id="count-log-error">0</span>)]</button>
+              </div>
+            </div>
+
+            <!-- LOGS METRICS BAR -->
+            <div style="padding: 10px 14px 0 14px;">
+              <div class="logs-metrics-bar">
+                <div class="lmb-item">
+                  <span class="lmb-lbl">TỔNG SỐ LẦN GỌI API:</span>
+                  <span class="lmb-val val-cyan" id="metric-log-total">0</span>
+                </div>
+                <div class="lmb-item">
+                  <span class="lmb-lbl">THÀNH CÔNG (200 OK):</span>
+                  <span class="lmb-val val-mint" id="metric-log-success">0</span>
+                </div>
+                <div class="lmb-item">
+                  <span class="lmb-lbl">LỖI / THẤT BẠI (4XX/5XX):</span>
+                  <span class="lmb-val val-red" id="metric-log-error">0</span>
+                </div>
+                <div class="lmb-item">
+                  <span class="lmb-lbl">TỶ LỆ THÀNH CÔNG:</span>
+                  <span class="lmb-val val-amber" id="metric-log-rate">100%</span>
+                </div>
+                <div class="lmb-item">
+                  <span class="lmb-lbl">LATENCY TRUNG BÌNH:</span>
+                  <span class="lmb-val" id="metric-log-latency">21 ms</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- TABLE SCROLL AREA -->
+            <div class="table-scroll-area" style="flex: 1; overflow: auto; padding: 0 14px 14px 14px;">
+              <table class="data-grid-table" id="table-api-logs" style="width: 100%; min-width: 900px;">
+                <thead>
+                  <tr>
+                    <th style="width: 60px;"># STT</th>
+                    <th style="width: 130px;">Thời gian</th>
+                    <th style="width: 90px;">Phương thức</th>
+                    <th style="width: 320px;">Đầu API Endpoint</th>
+                    <th style="width: 110px;">Mã HTTP</th>
+                    <th style="width: 120px;">Trạng thái</th>
+                    <th>Nội dung phản hồi / Chi tiết kết quả</th>
+                  </tr>
+                </thead>
+                <tbody id="tbody-api-logs">
+                  <!-- Rendered dynamically -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+        </section>
+
+      </div>
+    </div>
+
+  </div>
+
+  <script src="glide-grid.bundle.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

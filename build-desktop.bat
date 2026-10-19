@@ -1,21 +1,17 @@
 @echo off
-title Build ERPSYN Desktop Native App
+setlocal
+title Build ERPSYN Desktop
 echo ============================================================
-echo   🚀 DANG BUILD PHAN MEM ERPSYN DESKTOP (.EXE)
+echo   Build ERPSYN Desktop (Go + React + Tailwind + Glide)
 echo ============================================================
 echo.
-echo [1] Dong bo ma nguon giao dien vao package...
-xcopy /E /I /Y web cmd\gui\web >nul
-echo [2] Dang bien dich Golang sang file Windows Native GUI (.exe)...
-go build -ldflags "-H windowsgui -s -w" -o ERPSYN-Desktop.exe ./cmd/gui
-if %errorlevel% equ 0 (
+call npm run build:desktop
+if errorlevel 1 (
     echo.
-    echo ============================================================
-    echo   ✔ BUILD THANH CONG!
-    echo   File ung dung: ERPSYN-Desktop.exe (~10MB)
-    echo   Chi can nhap dup vao ERPSYN-Desktop.exe de su dung!
-    echo ============================================================
-) else (
-    echo [X] Co loi xay ra trong qua trinh bien dich.
+    echo [X] Build failed. Check the output above.
+    pause
+    exit /b 1
 )
+echo.
+echo Application created: ERPSYN-Desktop.exe
 pause

@@ -70,7 +70,9 @@ func enableVirtualTerminal() {
 
 func (s *Shell) Run() {
 	// 1. Nhập thông tin đăng nhập trực tiếp từ bàn phím khi chạy lệnh
-	s.initialLoginPrompt()
+	if !s.initialLoginPrompt() {
+		return
+	}
 
 	// 2. Bật tiến trình nền tự động gọi API định kỳ 5 phút
 	s.startAutoPollWorker()
@@ -265,7 +267,7 @@ func (s *Shell) dispatch(line string) bool {
 }
 
 // 1. Bàn đăng nhập hỏi người dùng Tên và Mật khẩu khi khởi chạy
-func (s *Shell) initialLoginPrompt() {
+func (s *Shell) initialLoginPrompt() bool {
 	fmt.Println()
 	fmt.Printf("%s╭──────────────────────────────────────────────────────────────────────────────╮%s\n", colorCyan, colorReset)
 	fmt.Printf("%s│%s   %s🔐 ĐĂNG NHẬP HỆ THỐNG BRAVO ERP / MES - GOLDSUN PACKAGING%s                 %s│%s\n", colorCyan, colorReset, colorBold+colorYellow, colorReset, colorCyan, colorReset)
@@ -308,23 +310,25 @@ func (s *Shell) initialLoginPrompt() {
 
 	if err != nil {
 		fmt.Printf("\r\033[K%s[✘] ĐĂNG NHẬP THẤT BẠI (%v): %v%s\n", colorRed+colorBold, elapsed, err, colorReset)
-		fmt.Printf("%s    (Hệ thống vẫn vào CLI để bạn chỉnh cấu hình hoặc dùng /login để thử lại)%s\n\n", colorYellow, colorReset)
-	} else {
-		_ = config.SaveConfig(s.cfg)
-		_ = s.database.UpsertEndpoint("Xác thực OAuth2 Token", "POST", s.cfg.ApiUrl, "Quản trị hệ thống", "Cấp Bearer Token và Refresh Token")
-		_ = s.database.UpsertEndpoint("Auto-Poll Bravo Định kỳ 5m", "GET", s.cfg.PollUrl, "Giám sát Gateway", "Truy vấn dữ liệu Bravo định kỳ 5 phút")
-		_ = s.database.UpsertEndpoint("Chi tiết Công đoạn SX (WorkProcessDetail)", "POST", s.cfg.DataUrl, "Lệnh sản xuất", "Truy vấn chi tiết công đoạn vB30WorkProcessDetail_Explorer")
-
-		tokSnippet := resp.AccessToken
-		if len(tokSnippet) > 40 {
-			tokSnippet = tokSnippet[:25] + "..." + tokSnippet[len(tokSnippet)-12:]
-		}
-
-		fmt.Printf("\r\033[K%s[✔] ĐĂNG NHẬP THÀNH CÔNG! (%v)%s\n", colorGreen+colorBold, elapsed, colorReset)
-		fmt.Printf("    ● Token: %s%s%s (Thời hạn: %d giây ~ %.1f giờ)\n", colorGreen, tokSnippet, colorReset, resp.ExpiresIn, float64(resp.ExpiresIn)/3600.0)
-		fmt.Printf("    ● SQLite DB: Đã lưu trữ Token và các Endpoint vào file `%s`\n", s.cfg.DBPath)
-		fmt.Printf("    ● Tự động gọi API: Tiến trình nền định kỳ 5 phút (%ds) đã được kích hoạt!\n\n", s.cfg.PollInterval)
+		fmt.Printf("%s[!] Đăng nhập không thành công. Dừng chương trình để bảo vệ tài khoản khỏi bị khóa.%s\n\n", colorRed, colorReset)
+		return false
 	}
+
+	_ = config.SaveConfig(s.cfg)
+	_ = s.database.UpsertEndpoint("Xác thực OAuth2 Token", "POST", s.cfg.ApiUrl, "Quản trị hệ thống", "Cấp Bearer Token và Refresh Token")
+	_ = s.database.UpsertEndpoint("Auto-Poll Bravo Định kỳ 5m", "GET", s.cfg.PollUrl, "Giám sát Gateway", "Truy vấn dữ liệu Bravo định kỳ 5 phút")
+	_ = s.database.UpsertEndpoint("Chi tiết Công đoạn SX (WorkProcessDetail)", "POST", s.cfg.DataUrl, "Lệnh sản xuất", "Truy vấn chi tiết công đoạn vB30WorkProcessDetail_Explorer")
+
+	tokSnippet := resp.AccessToken
+	if len(tokSnippet) > 40 {
+		tokSnippet = tokSnippet[:25] + "..." + tokSnippet[len(tokSnippet)-12:]
+	}
+
+	fmt.Printf("\r\033[K%s[✔] ĐĂNG NHẬP THÀNH CÔNG! (%v)%s\n", colorGreen+colorBold, elapsed, colorReset)
+	fmt.Printf("    ● Token: %s%s%s (Thời hạn: %d giây ~ %.1f giờ)\n", colorGreen, tokSnippet, colorReset, resp.ExpiresIn, float64(resp.ExpiresIn)/3600.0)
+	fmt.Printf("    ● SQLite DB: Đã lưu trữ Token và các Endpoint vào file `%s`\n", s.cfg.DBPath)
+	fmt.Printf("    ● Tự động gọi API: Tiến trình nền định kỳ 5 phút (%ds) đã được kích hoạt!\n\n", s.cfg.PollInterval)
+	return true
 }
 
 // 2. Bật tiến trình nền tự động gọi API mỗi 5 phút
@@ -578,7 +582,7 @@ func (s *Shell) cmdClearCache() {
 	fmt.Printf("● Đã xóa          : %s%d bản ghi%s trong bảng `synced_data` SQLite\n", colorYellow, count, colorReset)
 	fmt.Printf("● Bảo toàn        : %sBảng `auth_tokens` (Tài khoản login, Bearer Token) KHÔNG bị ảnh hưởng%s\n", colorGreen, colorReset)
 	fmt.Printf("● CSDL SQLite     : %s\n", s.cfg.DBPath)
-	fmt.Println("────────────────────────────────────────────────────────────────────────────────\n")
+	fmt.Println("────────────────────────────────────────────────────────────────────────────────")
 }
 
 func (s *Shell) spinner(stopChan chan bool, label string) {
@@ -1008,7 +1012,7 @@ func (s *Shell) cmdSearch(args []string) {
 		fmt.Printf("\n  %s📋 DANH SÁCH CHI TIẾT CÔNG ĐOẠN (%d DÒNG):%s\n", colorBold, len(res.Details), colorReset)
 
 		detailTable := tablewriter.NewWriter(os.Stdout)
-		detailTable.SetHeader([]string{"STT", "MÃ LỆNH CHI TIẾT", "MẶT HÀNG / TÊN SP", "MÃ HÀNG", "ĐVT", "CẦN SX", "SAU Đ/C", "MAX TK", "ROWID", "HẠN HOÀN TẤT"})
+		detailTable.SetHeader([]string{"STT", "MÃ LỆNH CHI TIẾT", "MẶT HÀNG / TÊN SP", "MÃ HÀNG", "ĐVT", "SL THEO LỆNH TK SX", "SL ĐÃ LẬP LỆNH", "SL CẦN ĐẠT (DO)", "Đ/C", "SL ĐIỀU CHỈNH", "SAU Đ/C", "MAX TK", "ROWID", "HẠN HOÀN TẤT"})
 		detailTable.SetAutoFormatHeaders(false)
 		detailTable.SetHeaderAlignment(tablewriter.ALIGN_LEFT)
 		detailTable.SetAlignment(tablewriter.ALIGN_LEFT)
@@ -1061,14 +1065,23 @@ func (s *Shell) cmdSearch(args []string) {
 				maxTKStr = fmt.Sprintf("%.0f", maxTK)
 			}
 
+			adjCheck := "-"
+			if d.AllowAdj == 1 {
+				adjCheck = "✔"
+			}
+
 			detailTable.Append([]string{
 				fmt.Sprintf("#%d", dIdx+1),
 				docDetail,
 				itemName,
 				itemCode,
 				d.Unit,
-				fmt.Sprintf("%.0f", d.QuantityProduce),
-				fmt.Sprintf("%.0f", d.QuantityAfterAdj),
+				formatQtyOrDash(d.QuantitySO),
+				formatQtyOrDash(d.QuantityCDIssue),
+				formatQtyOrDash(d.QuantityPass),
+				adjCheck,
+				formatAdj(d.QuantityAdj),
+				formatQtyOrDash(d.QuantityAfterAdj),
 				maxTKStr,
 				rowIdStr,
 				closedDate,
@@ -1092,7 +1105,7 @@ func (s *Shell) cmdSearch(args []string) {
 				colorBold+colorYellow, docDetail, d.RowId, colorReset)
 
 			stepTable := tablewriter.NewWriter(os.Stdout)
-			stepTable.SetHeader([]string{"STT", "MÃ THAO TÁC", "TÊN THAO TÁC CÔNG ĐOẠN", "SL ĐẠT TT", "SL SX TT", "ĐẠT THỐNG KÊ", "SL MAX THỐNG KÊ", "MÃ MÁY", "TÊN MÁY"})
+			stepTable.SetHeader([]string{"STT", "MÃ THAO TÁC", "MÃ PL THAO TÁC", "TÊN PHÂN LOẠI THAO TÁC", "SL CẦN ĐẠT", "SL CẦN SX", "SL ĐẠT ĐÃ LÊN LỆNH TT", "SL SX ĐÃ LÊN LỆNH TT", "ĐẠT THỐNG KÊ", "SX THỐNG KÊ", "MÃ MÁY", "TÊN MÁY"})
 			stepTable.SetAutoFormatHeaders(false)
 			stepTable.SetHeaderAlignment(tablewriter.ALIGN_LEFT)
 			stepTable.SetAlignment(tablewriter.ALIGN_LEFT)
@@ -1105,9 +1118,13 @@ func (s *Shell) cmdSearch(args []string) {
 			var maxProduceTK float64 = 0
 			var maxPassTK float64 = 0
 			for sIdx, st := range d.Steps {
-				stepName := st.WorkStepTypeName
-				if stepName == "" {
-					stepName = st.WorkStepTypeCode
+				stepTypeName := st.WorkStepTypeName
+				if stepTypeName == "" {
+					stepTypeName = "-"
+				}
+				stepTypeCode := st.WorkStepTypeCode
+				if stepTypeCode == "" {
+					stepTypeCode = "-"
 				}
 
 				mCode := st.MachineCode
@@ -1129,11 +1146,14 @@ func (s *Shell) cmdSearch(args []string) {
 				stepTable.Append([]string{
 					fmt.Sprintf("#%d", sIdx+1),
 					st.WorkStepCode,
-					stepName,
-					fmt.Sprintf("%.0f", st.QuantityPass),
-					fmt.Sprintf("%.0f", st.QuantityProduce),
-					fmt.Sprintf("%.0f", st.QuantityPassTK),
-					fmt.Sprintf("%.0f", st.QuantityProduceTK),
+					stepTypeCode,
+					stepTypeName,
+					formatQtyOrDash(st.QuantityCD),
+					formatQtyOrDash(st.QuantityTTIssue),
+					formatQtyOrDash(st.QuantityTransfered),
+					formatQtyOrDash(st.QuantityProductTransfer),
+					formatQtyOrDash(st.QuantityPassTK),
+					formatQtyOrDash(st.QuantityProduceTK),
 					mCode,
 					mName,
 				})
@@ -1205,7 +1225,7 @@ func (s *Shell) cmdSettle(args []string) {
 
 	// In bảng danh sách các dòng chi tiết hiện tại
 	table := tablewriter.NewWriter(os.Stdout)
-	table.SetHeader([]string{"STT", "MÃ LỆNH CHI TIẾT", "MẶT HÀNG", "MÃ HÀNG", "SL DO", "CẦN SX", "SAU Đ/C", "MAX TK", "ROWID"})
+	table.SetHeader([]string{"STT", "MÃ LỆNH CHI TIẾT", "MẶT HÀNG / TÊN SP", "MÃ HÀNG", "ĐVT", "SL THEO LỆNH TK SX", "SL ĐÃ LẬP LỆNH", "SL CẦN ĐẠT (DO)", "Đ/C", "SL ĐIỀU CHỈNH", "SAU Đ/C", "MAX TK", "ROWID"})
 	table.SetAutoFormatHeaders(false)
 	table.SetHeaderAlignment(tablewriter.ALIGN_LEFT)
 	table.SetAlignment(tablewriter.ALIGN_LEFT)
@@ -1230,14 +1250,23 @@ func (s *Shell) cmdSettle(args []string) {
 			maxTKStr = fmt.Sprintf("%.0f", maxTK)
 		}
 
+		adjCheck := "-"
+		if d.AllowAdj == 1 {
+			adjCheck = "✔"
+		}
+
 		table.Append([]string{
 			fmt.Sprintf("#%d", i+1),
 			d.DocNoDetail,
 			d.ItemName,
 			d.ItemCode,
-			fmt.Sprintf("%.0f", d.QuantitySO),
-			fmt.Sprintf("%.0f", d.QuantityProduce),
-			fmt.Sprintf("%.0f", d.QuantityAfterAdj),
+			d.Unit,
+			formatQtyOrDash(d.QuantitySO),
+			formatQtyOrDash(d.QuantityCDIssue),
+			formatQtyOrDash(d.QuantityPass),
+			adjCheck,
+			formatAdj(d.QuantityAdj),
+			formatQtyOrDash(d.QuantityAfterAdj),
 			maxTKStr,
 			d.RowId,
 		})
@@ -1265,16 +1294,18 @@ func (s *Shell) cmdSettle(args []string) {
 
 	fmt.Printf("\n%s🎯 ĐANG THAO TÁC QUYẾT TOÁN DÒNG #%d: %s (RowId: %s)%s\n",
 		colorBold+colorGreen, targetIdx+1, targetDetail.DocNoDetail, targetDetail.RowId, colorReset)
-	fmt.Printf("   ● SL theo DO        : %s%.0f%s\n", colorYellow, targetDetail.QuantitySO, colorReset)
-	fmt.Printf("   ● SL Cần SX hiện tại: %s%.0f%s\n", colorCyan, targetDetail.QuantityProduce, colorReset)
-	fmt.Printf("   ● SL Sau Đ/C hiện tại: %s%.0f%s\n", colorCyan, targetDetail.QuantityAfterAdj, colorReset)
+	fmt.Printf("   ● SL theo lệnh triển khai : %s%s%s\n", colorYellow, formatQtyOrDash(targetDetail.QuantitySO), colorReset)
+	fmt.Printf("   ● Số lượng đã lập lệnh    : %s%s%s\n", colorCyan, formatQtyOrDash(targetDetail.QuantityCDIssue), colorReset)
+	fmt.Printf("   ● SL Cần đạt theo DO      : %s%s%s\n", colorGreen, formatQtyOrDash(targetDetail.QuantityPass), colorReset)
+	fmt.Printf("   ● SL Điều chỉnh           : %s%s%s\n", colorYellow, formatAdj(targetDetail.QuantityAdj), colorReset)
+	fmt.Printf("   ● SL Sau Đ/C hiện tại     : %s%s%s\n", colorCyan, formatQtyOrDash(targetDetail.QuantityAfterAdj), colorReset)
 
 	var maxProduceTK float64 = 0
 	var maxPassTK float64 = 0
 	if len(targetDetail.Steps) > 0 {
 		fmt.Printf("\n  %s⚙️  TIẾN ĐỘ THỐNG KÊ THAO TÁC (vB30WorkProcessDetailTT):%s\n", colorBold+colorYellow, colorReset)
 		stepTable := tablewriter.NewWriter(os.Stdout)
-		stepTable.SetHeader([]string{"STT", "MÃ THAO TÁC", "TÊN THAO TÁC CÔNG ĐOẠN", "SL ĐẠT TT", "SL SX TT", "ĐẠT THỐNG KÊ", "SL MAX THỐNG KÊ", "MÃ MÁY", "TÊN MÁY"})
+		stepTable.SetHeader([]string{"STT", "MÃ THAO TÁC", "MÃ PL THAO TÁC", "TÊN PHÂN LOẠI THAO TÁC", "SL CẦN ĐẠT", "SL CẦN SX", "SL ĐẠT ĐÃ LÊN LỆNH TT", "SL SX ĐÃ LÊN LỆNH TT", "ĐẠT THỐNG KÊ", "SX THỐNG KÊ", "MÃ MÁY", "TÊN MÁY"})
 		stepTable.SetAutoFormatHeaders(false)
 		stepTable.SetHeaderAlignment(tablewriter.ALIGN_LEFT)
 		stepTable.SetAlignment(tablewriter.ALIGN_LEFT)
@@ -1285,9 +1316,13 @@ func (s *Shell) cmdSettle(args []string) {
 		stepTable.SetAutoWrapText(false)
 
 		for sIdx, st := range targetDetail.Steps {
-			stepName := st.WorkStepTypeName
-			if stepName == "" {
-				stepName = st.WorkStepTypeCode
+			stepTypeName := st.WorkStepTypeName
+			if stepTypeName == "" {
+				stepTypeName = "-"
+			}
+			stepTypeCode := st.WorkStepTypeCode
+			if stepTypeCode == "" {
+				stepTypeCode = "-"
 			}
 			mCode := st.MachineCode
 			if mCode == "" {
@@ -1308,11 +1343,14 @@ func (s *Shell) cmdSettle(args []string) {
 			stepTable.Append([]string{
 				fmt.Sprintf("#%d", sIdx+1),
 				st.WorkStepCode,
-				stepName,
-				fmt.Sprintf("%.0f", st.QuantityPass),
-				fmt.Sprintf("%.0f", st.QuantityProduce),
-				fmt.Sprintf("%.0f", st.QuantityPassTK),
-				fmt.Sprintf("%.0f", st.QuantityProduceTK),
+				stepTypeCode,
+				stepTypeName,
+				formatQtyOrDash(st.QuantityCD),
+				formatQtyOrDash(st.QuantityTTIssue),
+				formatQtyOrDash(st.QuantityTransfered),
+				formatQtyOrDash(st.QuantityProductTransfer),
+				formatQtyOrDash(st.QuantityPassTK),
+				formatQtyOrDash(st.QuantityProduceTK),
 				mCode,
 				mName,
 			})
@@ -1351,12 +1389,12 @@ func (s *Shell) cmdSettle(args []string) {
 	fmt.Printf("\n%s1. Nhập Số Lượng Điều Chỉnh (QuantityAdj):%s\n", colorBold, colorReset)
 	fmt.Printf("   [Gợi ý hợp lệ]:\n")
 	if maxTKVal > 0 && maxTKVal < targetDetail.QuantityProduce {
-		fmt.Printf("   • Nhập %s%.0f%s : Chốt về đúng SL Max Thống Kê (%.0f con — Mức hạ tối đa cho phép)\n", colorGreen, maxTKVal-targetDetail.QuantityProduce, maxTKVal, colorReset)
+		fmt.Printf("   • Nhập %s%.0f%s : Chốt về đúng SL Max Thống Kê (%.0f con — Mức hạ tối đa cho phép)\n", colorGreen, maxTKVal-targetDetail.QuantityProduce, colorReset, maxTKVal)
 	} else if maxTKVal == 0 {
 		fmt.Printf("   • Nhập %s%.0f%s : Đưa SL sau Đ/C về 0 (Chưa có thống kê phát sinh)\n", colorYellow, -targetDetail.QuantityProduce, colorReset)
 	}
 	if maxPassTK > 0 && maxPassTK >= maxTKVal {
-		fmt.Printf("   • Nhập %s%.0f%s : Chốt theo Đạt Thống Kê (%.0f con)\n", colorGreen, maxPassTK-targetDetail.QuantityProduce, maxPassTK, colorReset)
+		fmt.Printf("   • Nhập %s%.0f%s : Chốt theo Đạt Thống Kê (%.0f con)\n", colorGreen, maxPassTK-targetDetail.QuantityProduce, colorReset, maxPassTK)
 	}
 	fmt.Printf("   ❯ Nhập giá trị [Mặc định %.0f, Enter giữ nguyên]: ", suggestAdj)
 	inputAdj, _ := s.reader.ReadString('\n')
@@ -1551,7 +1589,7 @@ func (s *Shell) cmdLogs(limit int) {
 			statusColor, l.StatusCode, colorReset, 
 			summary)
 	}
-	fmt.Println("────────────────────────────────────────────────────────────────────────────────\n")
+	fmt.Println("────────────────────────────────────────────────────────────────────────────────")
 }
 
 func (s *Shell) cmdCurl() {
@@ -1756,7 +1794,7 @@ func (s *Shell) cmdHelp() {
 	fmt.Printf("  %s/clear-cache%s         : Xóa sạch bộ nhớ đệm (synced_data) trong SQLite - KHÔNG xóa Token\n", colorBold+colorRed, colorReset)
 	fmt.Println("─────────────────────────────────────────────────────────────────────────────────────────")
 	fmt.Printf("  %s/poll now%s            : Gọi thử nghiệm API Bravo 5m ngay lập tức để kiểm tra phản hồi\n", colorBold+colorCyan, colorReset)
-	fmt.Printf("  %s/poll status%s         : Xem trạng thái chu kỳ tự động gọi định kỳ 5 phút (%ds)\n", colorBold+colorCyan, s.cfg.PollInterval, colorReset)
+	fmt.Printf("  %s/poll status%s         : Xem trạng thái chu kỳ tự động gọi định kỳ 5 phút (%ds)\n", colorBold+colorCyan, colorReset, s.cfg.PollInterval)
 	fmt.Printf("  %s/poll curl%s           : In câu lệnh cURL chuẩn xác 100%% với 16 Headers & Bearer Token\n", colorBold+colorCyan, colorReset)
 	fmt.Printf("  %s/poll interval <s>%s   : Đổi chu kỳ tự động gọi (Ví dụ: /poll interval 300)\n", colorBold+colorCyan, colorReset)
 	fmt.Println("─────────────────────────────────────────────────────────────────────────────────────────")
@@ -1776,5 +1814,22 @@ func (s *Shell) cmdHelp() {
 	fmt.Printf("  %s/db%s                  : Xem các bản ghi dữ liệu đã đồng bộ lưu trong bảng synced_data\n", colorBold+colorCyan, colorReset)
 	fmt.Printf("  %s/clear%s               : Xóa sạch màn hình console\n", colorBold+colorGray, colorReset)
 	fmt.Printf("  %s/exit%s                : Dừng tiến trình nền và thoát\n", colorBold+colorRed, colorReset)
-	fmt.Println("─────────────────────────────────────────────────────────────────────────────────────────\n")
+	fmt.Println("─────────────────────────────────────────────────────────────────────────────────────────")
+}
+
+func formatQtyOrDash(val float64) string {
+	if val == 0 {
+		return "-"
+	}
+	return fmt.Sprintf("%.0f", val)
+}
+
+func formatAdj(adj float64) string {
+	if adj == 0 {
+		return "-"
+	}
+	if adj < 0 {
+		return fmt.Sprintf("(%.0f)", -adj)
+	}
+	return fmt.Sprintf("%.0f", adj)
 }

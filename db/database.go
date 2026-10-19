@@ -121,17 +121,29 @@ func InitDB(dbPath string) (*DB, error) {
 		description TEXT,
 		updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 	);
+
+	CREATE TABLE IF NOT EXISTS work_orders (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		stt TEXT,
+		doc_no TEXT UNIQUE,
+		doc_date TEXT,
+		process_code TEXT,
+		description TEXT,
+		factory_name TEXT,
+		created_by_name TEXT,
+		doc_status INTEGER,
+		status_text TEXT,
+		item_code TEXT,
+		item_name TEXT,
+		quantity REAL,
+		synced_at DATETIME DEFAULT CURRENT_TIMESTAMP
+	);
 	`
 
 	if _, err := conn.Exec(schema); err != nil {
 		conn.Close()
 		return nil, fmt.Errorf("không thể khởi tạo bảng dữ liệu: %w", err)
 	}
-
-	// Đảm bảo không tồn tại bảng work_orders và synced_data trong SQLite
-	_, _ = conn.Exec("DROP TABLE IF EXISTS work_orders")
-	_, _ = conn.Exec("DROP TABLE IF EXISTS work_order_details")
-	_, _ = conn.Exec("DROP TABLE IF EXISTS synced_data")
 
 	// Tự động dọn dẹp các endpoint giả /api/v1/ nếu còn sót trong CSDL
 	_, _ = conn.Exec("DELETE FROM api_endpoints WHERE endpoint_url LIKE '%/api/v1/%'")
@@ -433,4 +445,3 @@ func (d *DB) SetSettleEndpoint(stepKey, endpointURL, description string) error {
 	_, err := d.conn.Exec(query, stepKey, endpointURL, description)
 	return err
 }
-

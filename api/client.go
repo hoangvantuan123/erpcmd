@@ -910,15 +910,17 @@ func (c *Client) GetCurlForWorkOrdersAPI() string {
 // WorkStepOperation biểu diễn 1 dòng thao tác chi tiết (detailtt: vB30WorkProcessDetailTT)
 type WorkStepOperation struct {
 	BuiltinOrder             int     `json:"builtin_order"`
-	WorkStepCode             string  `json:"work_step_code"`               // Mã thao tác (VD: TT-CD03)
-	WorkStepTypeCode         string  `json:"work_step_type_code"`          // Loại thao tác
-	WorkStepTypeName         string  `json:"work_step_type_name"`          // Tên loại thao tác
-	QuantityPass             float64 `json:"quantity_pass"`                // SL Đạt Lên TT
-	QuantityProduce          float64 `json:"quantity_produce"`             // SL SX Lên TT
+	WorkStepCode             string  `json:"work_step_code"`               // Mã thao tác (VD: BOI, BE)
+	WorkStepTypeCode         string  `json:"work_step_type_code"`          // Mã phân loại thao tác (VD: BOI-01, BE-11)
+	WorkStepTypeName         string  `json:"work_step_type_name"`          // Tên phân loại thao tác
+	QuantityCD               float64 `json:"quantity_cd"`                  // Số lượng cần đạt (thao tác)
+	QuantityTTIssue          float64 `json:"quantity_tt_issue"`            // Số lượng cần sản xuất (thao tác)
+	QuantityPass             float64 `json:"quantity_pass"`                // Số lượng đạt đã lên lệnh thao tác
+	QuantityProduce          float64 `json:"quantity_produce"`             // Số lượng sản xuất đã lên lệnh thao tác
 	QuantityTransfered       float64 `json:"quantity_transfered"`          // SL Chuyển
 	QuantityProductTransfer  float64 `json:"quantity_product_transfered"`  // SL SP Chuyển
-	QuantityPassTK           float64 `json:"quantity_pass_tk"`             // SL Đạt Thống Kê
-	QuantityProduceTK        float64 `json:"quantity_produce_tk"`          // SL SX Thống Kê
+	QuantityPassTK           float64 `json:"quantity_pass_tk"`             // Số lượng đạt đã thống kê
+	QuantityProduceTK        float64 `json:"quantity_produce_tk"`          // Số lượng sản xuất đã thống kê
 	MachineCode              string  `json:"machine_code"`                 // Mã máy
 	MachineName              string  `json:"machine_name"`                 // Tên máy
 	FactoryName              string  `json:"factory_name"`                 // Nhà máy
@@ -1334,7 +1336,7 @@ func (c *Client) CallWorkProcessDetailRows(stt string) ([]WorkOrderDetailRow, er
 	return details, nil
 }
 
-const workProcessDetailTTPayloadTemplate = `{"ipo":false,"san":"detailtt","stn":"vB30WorkProcessDetailTT","alc":"CommandKey=WorkDocCD|LayoutName=Layout1|TemplateName=StatsDocVoucher","ndcn":"_NoDelete_8qz09h","nocn":"_NoOpen_7qctoik","necn":"_NoEdit_4g2m4v","nrcn":"_NoRecall_hv81tm","lst":0,"tpid":"ParentId","pnb":0,"vlm":null,"iis":false,"fcle":[{"opr":11,"eps":[{"opr":11,"eps":[{"opr":11,"eps":[{"opr":11,"eps":[{"opr":11,"eps":[{"opr":11,"eps":[{"opr":11,"eps":[{"opr":11,"eps":[{"opr":11,"eps":[{"opr":11,"eps":[{"opr":11,"eps":[{"opr":11,"eps":[{"opr":11,"eps":[{"opr":11,"eps":[{"opr":11,"eps":[{"opr":11,"eps":[{"opr":11,"eps":[{"opr":11,"eps":[{"opr":11,"eps":[{"opr":11,"eps":[{"opr":4,"val":"BuiltinOrder"},{"opr":4,"val":"WorkStepCode"}]},{"opr":4,"val":"WorkStepTypeCode"}]},{"opr":4,"val":"WorkStepTypeName"}]},{"opr":4,"val":"QuantityPass"}]},{"opr":4,"val":"QuantityProduce"}]},{"opr":4,"val":"QuantityTransfered"}]},{"opr":4,"val":"QuantityProductTransfered"}]},{"opr":4,"val":"QuantityPassTK"}]},{"opr":4,"val":"QuantityProduceTK"}]},{"opr":4,"val":"MachineCode"}]},{"opr":4,"val":"MachineName"}]},{"opr":4,"val":"FactoryName"}]},{"opr":4,"val":"FactoryList"}]},{"opr":4,"val":"BuiltinOrderDESC"}]},{"opr":4,"val":"RowId_CD"}]},{"opr":4,"val":"Id"}]},{"opr":4,"val":"CreatedBy"}]},{"opr":4,"val":"CreatedAt"}]},{"opr":4,"val":"ModifiedBy"}]},{"opr":4,"val":"ModifiedAt"}]}],"lps":{},"pkv":["%s"],"sse":{}}`
+const workProcessDetailTTPayloadTemplate = `{"ipo":false,"san":"detailtt","stn":"vB30WorkProcessDetailTT","alc":"CommandKey=WorkDocCD|LayoutName=Layout1|TemplateName=StatsDocVoucher","ndcn":"_NoDelete_8qz09h","nocn":"_NoOpen_7qctoik","necn":"_NoEdit_4g2m4v","nrcn":"_NoRecall_hv81tm","lst":0,"tpid":"ParentId","pnb":0,"vlm":null,"iis":false,"fcle":[{"opr":11,"eps":[{"opr":11,"eps":[{"opr":11,"eps":[{"opr":11,"eps":[{"opr":11,"eps":[{"opr":11,"eps":[{"opr":11,"eps":[{"opr":11,"eps":[{"opr":11,"eps":[{"opr":11,"eps":[{"opr":11,"eps":[{"opr":11,"eps":[{"opr":11,"eps":[{"opr":11,"eps":[{"opr":11,"eps":[{"opr":11,"eps":[{"opr":11,"eps":[{"opr":11,"eps":[{"opr":11,"eps":[{"opr":11,"eps":[{"opr":11,"eps":[{"opr":11,"eps":[{"opr":4,"val":"BuiltinOrder"},{"opr":4,"val":"WorkStepCode"}]},{"opr":4,"val":"WorkStepTypeCode"}]},{"opr":4,"val":"WorkStepTypeName"}]},{"opr":4,"val":"QuantityCD"}]},{"opr":4,"val":"QuantityTTIssue"}]},{"opr":4,"val":"QuantityPass"}]},{"opr":4,"val":"QuantityProduce"}]},{"opr":4,"val":"QuantityTransfered"}]},{"opr":4,"val":"QuantityProductTransfered"}]},{"opr":4,"val":"QuantityPassTK"}]},{"opr":4,"val":"QuantityProduceTK"}]},{"opr":4,"val":"MachineCode"}]},{"opr":4,"val":"MachineName"}]},{"opr":4,"val":"FactoryName"}]},{"opr":4,"val":"FactoryList"}]},{"opr":4,"val":"BuiltinOrderDESC"}]},{"opr":4,"val":"RowId_CD"}]},{"opr":4,"val":"Id"}]},{"opr":4,"val":"CreatedBy"}]},{"opr":4,"val":"CreatedAt"}]},{"opr":4,"val":"ModifiedBy"}]},{"opr":4,"val":"ModifiedAt"}]}],"lps":{},"pkv":["%s"],"sse":{}}`
 
 // CallWorkProcessDetailTTRows gọi API vB30WorkProcessDetailTT lấy danh sách thao tác chi tiết theo RowId_CD
 func (c *Client) CallWorkProcessDetailTTRows(rowIdCD string) ([]WorkStepOperation, error) {
@@ -1459,15 +1461,29 @@ func (c *Client) CallWorkProcessDetailTTRows(rowIdCD string) ([]WorkStepOperatio
 
 	var steps []WorkStepOperation
 	for _, row := range bResp.Rtv.Rows {
+		qPass := getFloat(row.Values, "QuantityPass")
+		qProduce := getFloat(row.Values, "QuantityProduce")
+		if qProduce == 0 {
+			qProduce = getFloat(row.Values, "QuantityProduce0")
+		}
+		if qProduce == 0 {
+			qProduce = getFloat(row.Values, "QuantityTTIssue")
+		}
+		qTrans := getFloat(row.Values, "QuantityTransfered")
+		qProdTrans := getFloat(row.Values, "QuantityProductTransfered")
+		qCD := getFloat(row.Values, "QuantityCD")
+
 		s := WorkStepOperation{
 			BuiltinOrder:            getInt(row.Values, "BuiltinOrder"),
 			WorkStepCode:            getStr(row.Values, "WorkStepCode"),
 			WorkStepTypeCode:        getStr(row.Values, "WorkStepTypeCode"),
 			WorkStepTypeName:        getStr(row.Values, "WorkStepTypeName"),
-			QuantityPass:            getFloat(row.Values, "QuantityPass"),
-			QuantityProduce:         getFloat(row.Values, "QuantityProduce"),
-			QuantityTransfered:      getFloat(row.Values, "QuantityTransfered"),
-			QuantityProductTransfer: getFloat(row.Values, "QuantityProductTransfered"),
+			QuantityCD:              qCD,
+			QuantityTTIssue:         qProduce,
+			QuantityPass:            qPass,
+			QuantityProduce:         qProduce,
+			QuantityTransfered:      qTrans,
+			QuantityProductTransfer: qProdTrans,
 			QuantityPassTK:          getFloat(row.Values, "QuantityPassTK"),
 			QuantityProduceTK:       getFloat(row.Values, "QuantityProduceTK"),
 			MachineCode:             getStr(row.Values, "MachineCode"),

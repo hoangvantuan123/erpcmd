@@ -1,11 +1,11 @@
-// web/app.js - MESSYN MES 3-Layout Desktop System Engine
+// web/app.js - ERPSYN MES 3-Layout Desktop System Engine
 
 const API_BASE = window.location.origin.includes('http') ? window.location.origin : 'http://localhost:8080';
 
 // Global State
 const state = {
-  layoutMode: localStorage.getItem('messyn_layout_mode') || 'bottom',
-  hostname: 'DESKTOP-CHS6OSJ', // Mặc định hiển thị tên máy trạm khi chưa đăng nhập
+  layoutMode: localStorage.getItem('erpsyn_layout_mode') || localStorage.getItem('messyn_layout_mode') || 'bottom',
+  hostname: 'TUANHV-ERP', // Tên máy trạm hiện tại
   user: '', // Trống khi chưa đăng nhập
   isAuthenticated: false,
   currentScreen: 'screen-wo', // Mặc định hiển thị ngay màn hình Lệnh công đoạn, không ép vào màn hình login
@@ -19,7 +19,7 @@ const state = {
   filteredOrders: [],
   selectedOrderIds: new Set(),
   modifiedOrders: new Map(),
-  gridEngine: localStorage.getItem('messyn_grid_engine') || 'glide',
+  gridEngine: localStorage.getItem('erpsyn_grid_engine') || localStorage.getItem('messyn_grid_engine') || 'glide',
   operationOrders: [],
   rollRecords: [],
   cliHistory: [],
@@ -124,7 +124,7 @@ function initLayoutMode(mode) {
 
 function setLayoutMode(mode) {
   state.layoutMode = mode;
-  localStorage.setItem('messyn_layout_mode', mode);
+  localStorage.setItem('erpsyn_layout_mode', mode);
 
   document.body.className = `theme-dark layout-mode-${mode}`;
 
@@ -237,7 +237,7 @@ function initNavigation() {
 
   // Listen for message from settings window
   window.addEventListener('message', (e) => {
-    if (e.data && (e.data.type === 'HERDR_SETTINGS_UPDATED' || e.data.type === 'MESSYN_SETTINGS_UPDATED')) {
+    if (e.data && (e.data.type === 'HERDR_SETTINGS_UPDATED' || e.data.type === 'ERPSYN_SETTINGS_UPDATED' || e.data.type === 'MESSYN_SETTINGS_UPDATED')) {
       if (e.data.colStates) {
         Object.entries(e.data.colStates).forEach(([colClass, isVisible]) => {
           document.body.classList.toggle(`hide-${colClass}`, !isVisible);
@@ -528,7 +528,7 @@ function initAuthScreen() {
       state.tokenExpiresIn = 1800;
 
       const userUpper = state.user;
-      const host = state.hostname || 'DESKTOP-CHS6OSJ';
+      const host = state.hostname || 'TUANHV-ERP';
 
       document.getElementById('chip-user-name').textContent = userUpper;
       document.getElementById('chip-user-name').className = 'chip-val val-cyan';
@@ -783,7 +783,7 @@ function performLogout() {
   if (btnTopLogout) btnTopLogout.style.display = 'none';
 
   // CLI Prompt reverts to Machine Hostname
-  const host = state.hostname || 'DESKTOP-CHS6OSJ';
+  const host = state.hostname || 'TUANHV-ERP';
   const termPromptLabel = document.getElementById('term-prompt-label');
   if (termPromptLabel) {
     termPromptLabel.textContent = `herdr [${host}] ❯`;
@@ -1099,7 +1099,7 @@ function executeCLICommand(raw) {
   state.cliHistory.push(cmd);
   state.cliHistoryIndex = -1;
 
-  const promptUser = state.isAuthenticated ? (state.user || 'IT_TUANHV') : (state.hostname || 'DESKTOP-CHS6OSJ');
+  const promptUser = state.isAuthenticated ? (state.user || 'IT_TUANHV') : (state.hostname || 'TUANHV-ERP');
   printCLILine(`herdr [${promptUser}] ❯ ${cmd}`, 'line-prompt');
 
   if (cmd === '/clear') {
@@ -1204,9 +1204,9 @@ Scope: ApiGateway offline_access | Chi nhánh: A01 | Năm: 2026`);
   if (cmd === '/status') {
     printCLILine(`[STATUS] THÔNG TIN HỆ THỐNG HERDR CONNECTOR ENGINE:
 ● Cổng kết nối Gateway: https://bravo.goldsunpackaging.vn:5051 (21ms)
-● Tài khoản: ${state.isAuthenticated ? state.user : '[CHƯA ĐĂNG NHẬP]'} | Máy trạm: ${state.hostname || 'DESKTOP-CHS6OSJ'}
+● Tài khoản: ${state.isAuthenticated ? state.user : '[CHƯA ĐĂNG NHẬP]'} | Máy trạm: ${state.hostname || 'TUANHV-ERP'}
 ● Bearer Token: ${state.isAuthenticated ? 'Hợp lệ (còn ' + state.tokenExpiresIn + 's)' : 'Chưa cấp'}
-● CSDL SQLite cục bộ: messyn_data.db (131 KB)
+● CSDL SQLite cục bộ: erpsyn_data.db
   - Lệnh sản xuất: ${state.workOrders.length} bản ghi
   - Lệnh thao tác: ${state.operationOrders.length} bản ghi
   - Cuộn giấy trên giàn: 5 cuộn (Tổng kho: 12 cuộn)`);
@@ -1860,7 +1860,7 @@ function initBlueprintTableInteractions() {
   if (btnGlide) {
     btnGlide.addEventListener('click', () => {
       state.gridEngine = 'glide';
-      localStorage.setItem('messyn_grid_engine', 'glide');
+      localStorage.setItem('erpsyn_grid_engine', 'glide');
       updateEngineButtons();
       renderWorkOrders();
       printCLILine(`[ENGINE] Đã kích hoạt Canvas Virtualization Grid (Glide Data Grid 6.0) - tối ưu phần cứng 60fps.`, 'line-ok');
@@ -1870,7 +1870,7 @@ function initBlueprintTableInteractions() {
   if (btnDom) {
     btnDom.addEventListener('click', () => {
       state.gridEngine = 'dom';
-      localStorage.setItem('messyn_grid_engine', 'dom');
+      localStorage.setItem('erpsyn_grid_engine', 'dom');
       updateEngineButtons();
       renderWorkOrders();
       printCLILine(`[ENGINE] Đã chuyển sang Classic DOM Table engine.`);
@@ -1919,7 +1919,7 @@ async function saveModifiedOrdersToDB() {
         statusEl.innerHTML = `<span class="bp-status-success">✓ Đã lưu ${result.count || itemsToSave.length} lệnh</span>`;
         setTimeout(() => { if (statusEl) statusEl.innerHTML = ''; }, 4000);
       }
-      printCLILine(`[DATABASE] Đã lưu thành công ${itemsToSave.length} lệnh quyết toán vào CSDL SQLite (messyn_data.db).`, 'line-ok');
+      printCLILine(`[DATABASE] Đã lưu thành công ${itemsToSave.length} lệnh quyết toán vào CSDL SQLite (erpsyn_data.db).`, 'line-ok');
     } else {
       if (statusEl) {
         statusEl.innerHTML = `<span style="color: #ff7373;">✕ Lỗi lưu CSDL: ${(result && result.error) || 'Thất bại'}</span>`;
@@ -2073,7 +2073,7 @@ function initColumnSettings() {
     });
   }
 
-  const saved = JSON.parse(localStorage.getItem('messyn_col_visibility') || '{}');
+  const saved = JSON.parse(localStorage.getItem('erpsyn_col_visibility') || localStorage.getItem('messyn_col_visibility') || '{}');
 
   panel.querySelectorAll('input[type="checkbox"]').forEach(cb => {
     const colClass = cb.getAttribute('data-col') || cb.getAttribute('data-detail-col');
@@ -2089,7 +2089,7 @@ function initColumnSettings() {
         table.classList.add(`hide-${colClass}`);
       }
       saved[colClass] = cb.checked;
-      localStorage.setItem('messyn_col_visibility', JSON.stringify(saved));
+      localStorage.setItem('erpsyn_col_visibility', JSON.stringify(saved));
     });
   });
 
@@ -2101,12 +2101,13 @@ function initColumnSettings() {
         table.classList.remove(`hide-${colClass}`);
         saved[colClass] = true;
       });
-      localStorage.setItem('messyn_col_visibility', JSON.stringify(saved));
+      localStorage.setItem('erpsyn_col_visibility', JSON.stringify(saved));
     });
   }
 
   if (btnReset) {
     btnReset.addEventListener('click', () => {
+      localStorage.removeItem('erpsyn_col_visibility');
       localStorage.removeItem('messyn_col_visibility');
       panel.querySelectorAll('input[type="checkbox"]').forEach(cb => {
         cb.checked = true;

@@ -1,10 +1,10 @@
 @echo off
-title MESSYN - Desktop Agent Workspace
+title ERPSYN - Desktop Agent Workspace
 echo ============================================================
-echo   🚀 DANG KHOI CHAY PHAN MEM MESSYN HERDR DESKTOP
+echo   🚀 DANG KHOI CHAY PHAN MEM ERPSYN HERDR DESKTOP
 echo ============================================================
 echo.
-echo [1] Khoi dong Backend Engine ket noi SQLite messyn_data.db...
+echo [1] Khoi dong Backend Engine ket noi SQLite erpsyn_data.db...
 start /b node web/server.js
 timeout /t 1 >nul
 echo [2] Dang mo cua so phan mem desktop doc lap (App Window Mode)...

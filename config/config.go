@@ -34,6 +34,34 @@ type Config struct {
 	WebPort        int    `json:"web_port"`
 }
 
+func GetSystemWsName() string {
+	comp := strings.TrimSpace(os.Getenv("COMPUTERNAME"))
+	if comp == "" {
+		h, err := os.Hostname()
+		if err == nil && h != "" {
+			comp = strings.TrimSpace(h)
+		}
+	}
+	if comp == "" {
+		comp = "localhost"
+	}
+	return comp
+}
+
+func GetSystemWsUser(wsName string) string {
+	u := strings.TrimSpace(os.Getenv("USERNAME"))
+	if u == "" {
+		u = strings.TrimSpace(os.Getenv("USER"))
+	}
+	if u == "" {
+		u = "user"
+	}
+	if wsName == "" {
+		wsName = GetSystemWsName()
+	}
+	return u + "@" + wsName
+}
+
 // GetEffectiveClientInfo tự động tính toán chuỗi clientinfo chuẩn xác theo chế độ Winform hoặc Web
 func (c *Config) GetEffectiveClientInfo() string {
 	if c.ClientMode == "web" {
@@ -43,46 +71,26 @@ func (c *Config) GetEffectiveClientInfo() string {
 		return "AppName=Bravo Web 10.9.5.1;WsName=113.22.84.155"
 	}
 
-	// Mặc định là Winform (Bản phần mềm desktop)
+	// Mặc định là Winform (Bản phần mềm máy trạm)
 	appName := c.AppName
 	if appName == "" {
 		appName = "B10.10.9.1.1"
 	}
 
 	wsName := c.WsName
-	if wsName == "" {
-		wsName = os.Getenv("COMPUTERNAME")
-		if wsName == "" {
-			hostname, _ := os.Hostname()
-			wsName = hostname
-		}
-		if wsName == "" {
-			wsName = "DESKTOP-CHS6OSJ"
-		}
+	if wsName == "" || wsName == "DESKTOP-CHS6OSJ" {
+		wsName = GetSystemWsName()
 	}
 
 	wsUser := c.WsUser
-	if wsUser == "" {
-		uName := os.Getenv("USERNAME")
-		if uName == "" {
-			uName = "tuanhoang"
-		}
-		wsUser = uName + "@" + wsName
+	if wsUser == "" || strings.Contains(wsUser, "tuanhoang") || strings.Contains(wsUser, "DESKTOP-CHS6OSJ") {
+		wsUser = GetSystemWsUser(wsName)
 	}
 
 	return "AppName=" + appName + ";WsName=" + wsName + ";WsUser=" + wsUser
 }
 
 func DefaultConfig() *Config {
-	compName := os.Getenv("COMPUTERNAME")
-	if compName == "" {
-		compName = "DESKTOP-CHS6OSJ"
-	}
-	userName := os.Getenv("USERNAME")
-	if userName == "" {
-		userName = "tuanhoang"
-	}
-
 	return &Config{
 		ApiUrl:         "https://bravo.goldsunpackaging.vn:5051/fa837234b0b27bc02365a940995bdc24",
 		PollUrl:        "https://bravo.goldsunpackaging.vn:5051/6e60af0b2cc4e2200d8c2ec545da3627",
@@ -102,12 +110,12 @@ func DefaultConfig() *Config {
 		Origin:         "https://bravo.goldsunpackaging.vn:5052",
 		Referer:        "https://bravo.goldsunpackaging.vn:5052/",
 		UserAgent:      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/155.0.0.0 Safari/537.36",
-		ClientInfo:     "AppName=B10.10.9.1.1;WsName=" + compName + ";WsUser=" + userName + "@" + compName,
+		ClientInfo:     "", // Để trống để tự động nhận diện từ máy trạm
 		ClientMode:     "winform",
 		AppName:        "B10.10.9.1.1",
-		WsName:         compName,
-		WsUser:         userName + "@" + compName,
-		DBPath:         "messyn_data.db",
+		WsName:         "", // Để trống để tự động nhận diện từ máy trạm
+		WsUser:         "", // Để trống để tự động nhận diện từ máy trạm
+		DBPath:         "erpsyn_data.db",
 		WebPort:        8080,
 	}
 }
@@ -159,27 +167,33 @@ func LoadConfig() (*Config, error) {
 	if cfg.AppName == "" {
 		cfg.AppName = "B10.10.9.1.1"
 	}
-	if cfg.WsName == "" {
-		cfg.WsName = os.Getenv("COMPUTERNAME")
-		if cfg.WsName == "" {
-			cfg.WsName = "DESKTOP-CHS6OSJ"
-		}
+
+	// Tự động nhận diện thiết bị và tài khoản thực tế từ máy trạm đang chạy
+	if cfg.WsName == "" || cfg.WsName == "DESKTOP-CHS6OSJ" {
+		cfg.WsName = GetSystemWsName()
 	}
-	if cfg.WsUser == "" {
-		u := os.Getenv("USERNAME")
-		if u == "" {
-			u = "tuanhoang"
-		}
-		cfg.WsUser = u + "@" + cfg.WsName
+	if cfg.WsUser == "" || strings.Contains(cfg.WsUser, "tuanhoang") || strings.Contains(cfg.WsUser, "DESKTOP-CHS6OSJ") {
+		cfg.WsUser = GetSystemWsUser(cfg.WsName)
 	}
 	cfg.ClientInfo = cfg.GetEffectiveClientInfo()
 
-	_ = SaveConfig(cfg)
+	// KHÔNG gọi SaveConfig để tránh ghi đè tên máy tĩnh vào file config.json
 	return cfg, nil
 }
 
 func SaveConfig(cfg *Config) error {
-	data, err := json.MarshalIndent(cfg, "", "  ")
+	// Tạo bản sao để lưu config.json sạch sẽ, không lưu cứng tên máy
+	saveCfg := *cfg
+	// Nếu người dùng không chỉ định tên máy đặc biệt thì để rỗng để máy khác dùng tự nhận
+	if saveCfg.WsName == GetSystemWsName() {
+		saveCfg.WsName = ""
+	}
+	if saveCfg.WsUser == GetSystemWsUser(GetSystemWsName()) {
+		saveCfg.WsUser = ""
+	}
+	saveCfg.ClientInfo = ""
+
+	data, err := json.MarshalIndent(&saveCfg, "", "  ")
 	if err != nil {
 		return err
 	}

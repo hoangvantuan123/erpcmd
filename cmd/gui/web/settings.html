@@ -206,7 +206,7 @@
     <div class="header-title">&gt;_ HERDR — CẤU HÌNH NGHIỆP VỤ &amp; HỆ THỐNG</div>
     <div class="header-actions">
       <button type="button" class="btn-theme-toggle" id="btn-theme-toggle" title="Chuyển đổi giao diện Sáng / Tối">[Giao diện: Nền Trắng]</button>
-      <div class="header-badge">MÁY TRẠM: <span id="lbl-hostname">DESKTOP-CHS6OSJ</span></div>
+      <div class="header-badge">MÁY TRẠM: <span id="lbl-hostname">TUANHV-ERP</span></div>
     </div>
   </div>
 
@@ -217,7 +217,7 @@
       
       <div class="field-row">
         <label>Tên máy trạm Client (Machine Host):</label>
-        <input type="text" id="cfg-hostname" value="DESKTOP-CHS6OSJ" disabled style="color: #888888;">
+        <input type="text" id="cfg-hostname" value="TUANHV-ERP" disabled style="color: #888888;">
       </div>
 
       <div class="field-row">
@@ -318,8 +318,8 @@
   </div>
 
   <script>
-    const STORAGE_KEY_COLS = 'messyn_column_visibility';
-    const STORAGE_KEY_CFG = 'messyn_system_settings';
+    const STORAGE_KEY_COLS = 'erpsyn_column_visibility';
+    const STORAGE_KEY_CFG = 'erpsyn_system_settings';
     const STORAGE_KEY_THEME = 'herdr_settings_theme';
 
     // Theme setup (Default is White / Light as requested)
@@ -343,6 +343,25 @@
       const isDark = document.body.classList.contains('theme-dark');
       applyTheme(isDark ? 'light' : 'dark');
     });
+
+    // Load dynamic server status
+    fetch('/api/status').then(r => r.json()).then(data => {
+      if (data && data.hostname) {
+        document.getElementById('lbl-hostname').textContent = data.hostname;
+        document.getElementById('cfg-hostname').value = data.hostname;
+      }
+      if (data && data.client_mode) {
+        const modeEl = document.getElementById('cfg-client-mode');
+        if (modeEl) modeEl.value = data.client_mode;
+      }
+      if (data && data.username && !document.getElementById('cfg-username').value) {
+        document.getElementById('cfg-username').value = data.username;
+      }
+      if (data && data.token && data.token.access_token) {
+        const tokEl = document.getElementById('cfg-token-str');
+        if (tokEl) tokEl.value = data.token.access_token;
+      }
+    }).catch(() => {});
 
     // Load saved settings
     try {
@@ -382,6 +401,7 @@
 
       // Notify parent window if open
       if (window.opener && !window.opener.closed) {
+        window.opener.postMessage({ type: 'ERPSYN_SETTINGS_UPDATED', colStates, cfg }, '*');
         window.opener.postMessage({ type: 'MESSYN_SETTINGS_UPDATED', colStates, cfg }, '*');
       }
 

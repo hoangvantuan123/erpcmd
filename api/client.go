@@ -10,8 +10,8 @@ import (
 	"strings"
 	"time"
 
-	"messyn/config"
-	"messyn/db"
+	"erpsyn/config"
+	"erpsyn/db"
 )
 
 type Client struct {
@@ -92,22 +92,15 @@ func (c *Client) Login() (*AuthResponse, error) {
 		req.Header.Set("fiscalyear", c.cfg.FiscalYear)
 	}
 	req.Header.Set("lang", "0")
-	if c.cfg.Origin != "" {
-		req.Header.Set("origin", c.cfg.Origin)
-	}
-	if c.cfg.Referer != "" {
-		req.Header.Set("Referer", c.cfg.Referer)
-	}
 
-	if c.cfg.ClientMode == "winform" {
-		// Bản Winform (Desktop / HMI):
-		// - Tên thiết bị: DESKTOP-CHS6OSJ (lấy từ WsName trong clientinfo)
-		// - Nền tảng: Winform
-		// - __WsUser: tuanhoang@DESKTOP-CHS6OSJ (lấy từ WsUser trong clientinfo)
-		// - __AppName: B10.10.9.1.1 (lấy từ AppName trong clientinfo)
-		// - __DeviceInfo: NULL (do không gửi browser User-Agent của Chrome)
-	} else {
+	if c.cfg.ClientMode == "web" {
 		// Bản Web (Browser):
+		if c.cfg.Origin != "" {
+			req.Header.Set("origin", c.cfg.Origin)
+		}
+		if c.cfg.Referer != "" {
+			req.Header.Set("Referer", c.cfg.Referer)
+		}
 		req.Header.Set("User-Agent", c.cfg.UserAgent)
 		req.Header.Set("sec-ch-ua-platform", `"Windows"`)
 		req.Header.Set("sec-ch-ua", `"Google Chrome";v="155", "Chromium";v="155", "Not(A:Brand";v="24"`)
@@ -254,9 +247,13 @@ func (c *Client) CallBravoPollAPI(targetURL string) ([]byte, int, time.Duration,
 	req.Header.Set("clientinfo", clientInfo)
 	req.Header.Set("fiscalyear", c.cfg.FiscalYear)
 	req.Header.Set("lang", "0")
-	req.Header.Set("origin", c.cfg.Origin)
-	req.Header.Set("referer", c.cfg.Referer)
 	if c.cfg.ClientMode == "web" {
+		if c.cfg.Origin != "" {
+			req.Header.Set("origin", c.cfg.Origin)
+		}
+		if c.cfg.Referer != "" {
+			req.Header.Set("referer", c.cfg.Referer)
+		}
 		req.Header.Set("priority", "u=1, i")
 		req.Header.Set("sec-ch-ua", `"Google Chrome";v="155", "Chromium";v="155", "Not(A:Brand";v="24"`)
 		req.Header.Set("sec-ch-ua-mobile", "?0")
@@ -335,8 +332,6 @@ func (c *Client) GetCurlForLogin() string {
   -H 'branchcode: %s' \
   -H 'fiscalyear: %s' \
   -H 'lang: 0' \
-  -H 'origin: %s' \
-  -H 'Referer: %s' \
   --data-urlencode 'client_id=%s' \
   --data-urlencode 'client_secret=%s' \
   --data-urlencode 'device_code=%s' \
@@ -352,8 +347,6 @@ func (c *Client) GetCurlForLogin() string {
 			clientInfo,
 			c.cfg.BranchCode,
 			c.cfg.FiscalYear,
-			c.cfg.Origin,
-			c.cfg.Referer,
 			c.cfg.ClientId,
 			c.cfg.ClientSecret,
 			c.cfg.DeviceCode,
@@ -510,8 +503,10 @@ func (c *Client) CallWorkProcessDetailAPI(targetURL, pkv string) ([]byte, int, t
 	req.Header.Set("BranchCode", c.cfg.BranchCode)
 	req.Header.Set("FiscalYear", c.cfg.FiscalYear)
 	req.Header.Set("Lang", "0")
-	req.Header.Set("Referer", c.cfg.Referer)
 	if c.cfg.ClientMode == "web" {
+		if c.cfg.Referer != "" {
+			req.Header.Set("Referer", c.cfg.Referer)
+		}
 		req.Header.Set("sec-ch-ua-platform", `"Windows"`)
 		req.Header.Set("sec-ch-ua", `"Google Chrome";v="155", "Chromium";v="155", "Not(A:Brand";v="24"`)
 		req.Header.Set("sec-ch-ua-mobile", "?0")
@@ -688,8 +683,10 @@ func (c *Client) CallWorkOrdersAPI() ([]db.WorkOrderRecord, []byte, int, time.Du
 	req.Header.Set("BranchCode", c.cfg.BranchCode)
 	req.Header.Set("FiscalYear", c.cfg.FiscalYear)
 	req.Header.Set("Lang", "0")
-	req.Header.Set("Referer", c.cfg.Referer)
 	if c.cfg.ClientMode == "web" {
+		if c.cfg.Referer != "" {
+			req.Header.Set("Referer", c.cfg.Referer)
+		}
 		req.Header.Set("sec-ch-ua-platform", `"Windows"`)
 		req.Header.Set("sec-ch-ua", `"Google Chrome";v="155", "Chromium";v="155", "Not(A:Brand";v="24"`)
 		req.Header.Set("sec-ch-ua-mobile", "?0")
@@ -1064,8 +1061,10 @@ func (c *Client) SearchWorkOrdersAPI(keyword string) ([]WorkOrderWithDetails, in
 	req.Header.Set("BranchCode", c.cfg.BranchCode)
 	req.Header.Set("FiscalYear", c.cfg.FiscalYear)
 	req.Header.Set("Lang", "0")
-	req.Header.Set("Referer", c.cfg.Referer)
 	if c.cfg.ClientMode == "web" {
+		if c.cfg.Referer != "" {
+			req.Header.Set("Referer", c.cfg.Referer)
+		}
 		req.Header.Set("sec-ch-ua-platform", `"Windows"`)
 		req.Header.Set("sec-ch-ua", `"Google Chrome";v="155", "Chromium";v="155", "Not(A:Brand";v="24"`)
 		req.Header.Set("sec-ch-ua-mobile", "?0")
@@ -1367,8 +1366,10 @@ func (c *Client) CallWorkProcessDetailTTRows(rowIdCD string) ([]WorkStepOperatio
 	req.Header.Set("BranchCode", c.cfg.BranchCode)
 	req.Header.Set("FiscalYear", c.cfg.FiscalYear)
 	req.Header.Set("Lang", "0")
-	req.Header.Set("Referer", c.cfg.Referer)
 	if c.cfg.ClientMode == "web" {
+		if c.cfg.Referer != "" {
+			req.Header.Set("Referer", c.cfg.Referer)
+		}
 		req.Header.Set("sec-ch-ua-platform", `"Windows"`)
 		req.Header.Set("sec-ch-ua", `"Google Chrome";v="155", "Chromium";v="155", "Not(A:Brand";v="24"`)
 		req.Header.Set("sec-ch-ua-mobile", "?0")

@@ -17,11 +17,11 @@
   "origin": "https://bravo.goldsunpackaging.vn:5052",
   "referer": "https://bravo.goldsunpackaging.vn:5052/",
   "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/155.0.0.0 Safari/537.36",
-  "client_info": "AppName=B10.10.9.1.1;WsName=DESKTOP-CHS6OSJ;WsUser=tuanhoang@DESKTOP-CHS6OSJ",
+  "client_info": "",
   "client_mode": "winform",
   "app_name": "B10.10.9.1.1",
-  "ws_name": "DESKTOP-CHS6OSJ",
-  "ws_user": "tuanhoang@DESKTOP-CHS6OSJ",
-  "db_path": "messyn_data.db",
+  "ws_name": "",
+  "ws_user": "",
+  "db_path": "erpsyn_data.db",
   "web_port": 8080
 }

@@ -16,9 +16,9 @@ import (
 
 	"github.com/olekukonko/tablewriter"
 
-	"messyn/api"
-	"messyn/config"
-	"messyn/db"
+	"erpsyn/api"
+	"erpsyn/config"
+	"erpsyn/db"
 )
 
 // ANSI color codes
@@ -1008,7 +1008,7 @@ func (s *Shell) cmdSearch(args []string) {
 		fmt.Printf("\n  %s📋 DANH SÁCH CHI TIẾT CÔNG ĐOẠN (%d DÒNG):%s\n", colorBold, len(res.Details), colorReset)
 
 		detailTable := tablewriter.NewWriter(os.Stdout)
-		detailTable.SetHeader([]string{"STT", "MÃ LỆNH CHI TIẾT", "MẶT HÀNG / TÊN SP", "MÃ HÀNG", "ĐVT", "CẦN SX", "SAU Đ/C", "ROWID", "HẠN HOÀN TẤT"})
+		detailTable.SetHeader([]string{"STT", "MÃ LỆNH CHI TIẾT", "MẶT HÀNG / TÊN SP", "MÃ HÀNG", "ĐVT", "CẦN SX", "SAU Đ/C", "MAX TK", "ROWID", "HẠN HOÀN TẤT"})
 		detailTable.SetAutoFormatHeaders(false)
 		detailTable.SetHeaderAlignment(tablewriter.ALIGN_LEFT)
 		detailTable.SetAlignment(tablewriter.ALIGN_LEFT)
@@ -1047,6 +1047,20 @@ func (s *Shell) cmdSearch(args []string) {
 				rowIdStr = master.Stt
 			}
 
+			var maxTK float64 = 0
+			for _, st := range d.Steps {
+				if st.QuantityProduceTK > maxTK {
+					maxTK = st.QuantityProduceTK
+				}
+				if st.QuantityPassTK > maxTK {
+					maxTK = st.QuantityPassTK
+				}
+			}
+			maxTKStr := "-"
+			if maxTK > 0 {
+				maxTKStr = fmt.Sprintf("%.0f", maxTK)
+			}
+
 			detailTable.Append([]string{
 				fmt.Sprintf("#%d", dIdx+1),
 				docDetail,
@@ -1055,6 +1069,7 @@ func (s *Shell) cmdSearch(args []string) {
 				d.Unit,
 				fmt.Sprintf("%.0f", d.QuantityProduce),
 				fmt.Sprintf("%.0f", d.QuantityAfterAdj),
+				maxTKStr,
 				rowIdStr,
 				closedDate,
 			})
@@ -1077,7 +1092,7 @@ func (s *Shell) cmdSearch(args []string) {
 				colorBold+colorYellow, docDetail, d.RowId, colorReset)
 
 			stepTable := tablewriter.NewWriter(os.Stdout)
-			stepTable.SetHeader([]string{"STT", "MÃ THAO TÁC", "TÊN THAO TÁC CÔNG ĐOẠN", "SL ĐẠT TT", "SL SX TT", "ĐẠT THỐNG KÊ", "MÃ MÁY", "TÊN MÁY"})
+			stepTable.SetHeader([]string{"STT", "MÃ THAO TÁC", "TÊN THAO TÁC CÔNG ĐOẠN", "SL ĐẠT TT", "SL SX TT", "ĐẠT THỐNG KÊ", "SL MAX THỐNG KÊ", "MÃ MÁY", "TÊN MÁY"})
 			stepTable.SetAutoFormatHeaders(false)
 			stepTable.SetHeaderAlignment(tablewriter.ALIGN_LEFT)
 			stepTable.SetAlignment(tablewriter.ALIGN_LEFT)
@@ -1087,6 +1102,8 @@ func (s *Shell) cmdSearch(args []string) {
 			stepTable.SetBorder(true)
 			stepTable.SetAutoWrapText(false)
 
+			var maxProduceTK float64 = 0
+			var maxPassTK float64 = 0
 			for sIdx, st := range d.Steps {
 				stepName := st.WorkStepTypeName
 				if stepName == "" {
@@ -1102,6 +1119,13 @@ func (s *Shell) cmdSearch(args []string) {
 					mName = "-"
 				}
 
+				if st.QuantityProduceTK > maxProduceTK {
+					maxProduceTK = st.QuantityProduceTK
+				}
+				if st.QuantityPassTK > maxPassTK {
+					maxPassTK = st.QuantityPassTK
+				}
+
 				stepTable.Append([]string{
 					fmt.Sprintf("#%d", sIdx+1),
 					st.WorkStepCode,
@@ -1109,11 +1133,28 @@ func (s *Shell) cmdSearch(args []string) {
 					fmt.Sprintf("%.0f", st.QuantityPass),
 					fmt.Sprintf("%.0f", st.QuantityProduce),
 					fmt.Sprintf("%.0f", st.QuantityPassTK),
+					fmt.Sprintf("%.0f", st.QuantityProduceTK),
 					mCode,
 					mName,
 				})
 			}
 			stepTable.Render()
+			fmt.Printf("   ⭐ %sSL Max Thống Kê (SX)%s: %s%.0f%s | %sSL Đạt Thống Kê cao nhất%s: %s%.0f%s\n",
+				colorBold+colorYellow, colorReset, colorBold+colorGreen, maxProduceTK, colorReset,
+				colorBold+colorYellow, colorReset, colorBold+colorGreen, maxPassTK, colorReset)
+
+			// Kiểm tra điều kiện quyết toán theo quy tắc thống kê
+			maxTKVal := maxProduceTK
+			if maxPassTK > maxTKVal {
+				maxTKVal = maxPassTK
+			}
+			if maxTKVal > 0 && d.QuantityAfterAdj > 0 && maxTKVal >= d.QuantityAfterAdj {
+				fmt.Printf("   %s⛔ [KHÔNG THỂ QUYẾT TOÁN]: Số lượng thống kê đã đạt %.0f/%.0f (bằng SL cần đạt sau điều chỉnh). Lệnh đã hoàn thành đủ sản lượng!%s\n",
+					colorBold+colorRed, maxTKVal, d.QuantityAfterAdj, colorReset)
+			} else if maxTKVal > 0 && maxTKVal < d.QuantityAfterAdj {
+				fmt.Printf("   %sℹ️  [RÀNG BUỘC THỐNG KÊ]: Đã thống kê được %.0f/%.0f. Khi quyết toán KHÔNG ĐƯỢC HẠ QUÁ %.0f (SL cần đạt tối thiểu phải là %.0f)!%s\n",
+					colorBold+colorYellow, maxTKVal, d.QuantityAfterAdj, maxTKVal, maxTKVal, colorReset)
+			}
 		}
 	}
 
@@ -1164,7 +1205,7 @@ func (s *Shell) cmdSettle(args []string) {
 
 	// In bảng danh sách các dòng chi tiết hiện tại
 	table := tablewriter.NewWriter(os.Stdout)
-	table.SetHeader([]string{"STT", "MÃ LỆNH CHI TIẾT", "MẶT HÀNG", "MÃ HÀNG", "SL DO", "CẦN SX", "SAU Đ/C", "ROWID"})
+	table.SetHeader([]string{"STT", "MÃ LỆNH CHI TIẾT", "MẶT HÀNG", "MÃ HÀNG", "SL DO", "CẦN SX", "SAU Đ/C", "MAX TK", "ROWID"})
 	table.SetAutoFormatHeaders(false)
 	table.SetHeaderAlignment(tablewriter.ALIGN_LEFT)
 	table.SetAlignment(tablewriter.ALIGN_LEFT)
@@ -1175,6 +1216,20 @@ func (s *Shell) cmdSettle(args []string) {
 	table.SetAutoWrapText(false)
 
 	for i, d := range res.Details {
+		var maxTK float64 = 0
+		for _, st := range d.Steps {
+			if st.QuantityProduceTK > maxTK {
+				maxTK = st.QuantityProduceTK
+			}
+			if st.QuantityPassTK > maxTK {
+				maxTK = st.QuantityPassTK
+			}
+		}
+		maxTKStr := "-"
+		if maxTK > 0 {
+			maxTKStr = fmt.Sprintf("%.0f", maxTK)
+		}
+
 		table.Append([]string{
 			fmt.Sprintf("#%d", i+1),
 			d.DocNoDetail,
@@ -1183,6 +1238,7 @@ func (s *Shell) cmdSettle(args []string) {
 			fmt.Sprintf("%.0f", d.QuantitySO),
 			fmt.Sprintf("%.0f", d.QuantityProduce),
 			fmt.Sprintf("%.0f", d.QuantityAfterAdj),
+			maxTKStr,
 			d.RowId,
 		})
 	}
@@ -1202,18 +1258,110 @@ func (s *Shell) cmdSettle(args []string) {
 	}
 
 	targetDetail := res.Details[targetIdx]
+	if len(targetDetail.Steps) == 0 && targetDetail.RowId != "" {
+		steps, _ := s.client.CallWorkProcessDetailTTRows(targetDetail.RowId)
+		targetDetail.Steps = steps
+	}
+
 	fmt.Printf("\n%s🎯 ĐANG THAO TÁC QUYẾT TOÁN DÒNG #%d: %s (RowId: %s)%s\n",
 		colorBold+colorGreen, targetIdx+1, targetDetail.DocNoDetail, targetDetail.RowId, colorReset)
-	fmt.Printf("   ● SL theo DO      : %s%.0f%s\n", colorYellow, targetDetail.QuantitySO, colorReset)
+	fmt.Printf("   ● SL theo DO        : %s%.0f%s\n", colorYellow, targetDetail.QuantitySO, colorReset)
 	fmt.Printf("   ● SL Cần SX hiện tại: %s%.0f%s\n", colorCyan, targetDetail.QuantityProduce, colorReset)
 	fmt.Printf("   ● SL Sau Đ/C hiện tại: %s%.0f%s\n", colorCyan, targetDetail.QuantityAfterAdj, colorReset)
 
-	// Nhập SL điều chỉnh
-	fmt.Printf("\n%s1. Nhập Số Lượng Điều Chỉnh (QuantityAdj) [Ví dụ: -%.0f để về 0, Enter giữ nguyên]:%s ",
-		colorBold, targetDetail.QuantityProduce, colorReset)
+	var maxProduceTK float64 = 0
+	var maxPassTK float64 = 0
+	if len(targetDetail.Steps) > 0 {
+		fmt.Printf("\n  %s⚙️  TIẾN ĐỘ THỐNG KÊ THAO TÁC (vB30WorkProcessDetailTT):%s\n", colorBold+colorYellow, colorReset)
+		stepTable := tablewriter.NewWriter(os.Stdout)
+		stepTable.SetHeader([]string{"STT", "MÃ THAO TÁC", "TÊN THAO TÁC CÔNG ĐOẠN", "SL ĐẠT TT", "SL SX TT", "ĐẠT THỐNG KÊ", "SL MAX THỐNG KÊ", "MÃ MÁY", "TÊN MÁY"})
+		stepTable.SetAutoFormatHeaders(false)
+		stepTable.SetHeaderAlignment(tablewriter.ALIGN_LEFT)
+		stepTable.SetAlignment(tablewriter.ALIGN_LEFT)
+		stepTable.SetCenterSeparator("┼")
+		stepTable.SetColumnSeparator("│")
+		stepTable.SetRowSeparator("─")
+		stepTable.SetBorder(true)
+		stepTable.SetAutoWrapText(false)
+
+		for sIdx, st := range targetDetail.Steps {
+			stepName := st.WorkStepTypeName
+			if stepName == "" {
+				stepName = st.WorkStepTypeCode
+			}
+			mCode := st.MachineCode
+			if mCode == "" {
+				mCode = "-"
+			}
+			mName := st.MachineName
+			if mName == "" {
+				mName = "-"
+			}
+
+			if st.QuantityProduceTK > maxProduceTK {
+				maxProduceTK = st.QuantityProduceTK
+			}
+			if st.QuantityPassTK > maxPassTK {
+				maxPassTK = st.QuantityPassTK
+			}
+
+			stepTable.Append([]string{
+				fmt.Sprintf("#%d", sIdx+1),
+				st.WorkStepCode,
+				stepName,
+				fmt.Sprintf("%.0f", st.QuantityPass),
+				fmt.Sprintf("%.0f", st.QuantityProduce),
+				fmt.Sprintf("%.0f", st.QuantityPassTK),
+				fmt.Sprintf("%.0f", st.QuantityProduceTK),
+				mCode,
+				mName,
+			})
+		}
+		stepTable.Render()
+		fmt.Printf("   ⭐ %sSL Max Thống Kê (SX)%s: %s%.0f%s | %sSL Đạt Thống Kê cao nhất%s: %s%.0f%s\n",
+			colorBold+colorYellow, colorReset, colorBold+colorGreen, maxProduceTK, colorReset,
+			colorBold+colorYellow, colorReset, colorBold+colorGreen, maxPassTK, colorReset)
+	}
+
+	maxTKVal := maxProduceTK
+	if maxPassTK > maxTKVal {
+		maxTKVal = maxPassTK
+	}
+
+	// Kiểm tra nếu số lượng thống kê đã bằng hoặc vượt quá SL cần đạt sau điều chỉnh
+	if maxTKVal > 0 && targetDetail.QuantityAfterAdj > 0 && maxTKVal >= targetDetail.QuantityAfterAdj {
+		fmt.Printf("\n%s⛔ [TỪ CHỐI THỰC HIỆN — LỆNH ĐÃ HOÀN THÀNH ĐỦ THỐNG KÊ]:%s\n", colorBold+colorRed, colorReset)
+		fmt.Printf("   ● SL cần đạt sau điều chỉnh hiện tại : %s%.0f%s\n", colorCyan, targetDetail.QuantityAfterAdj, colorReset)
+		fmt.Printf("   ● SL sản xuất đã thống kê thực tế   : %s%.0f%s\n", colorGreen, maxTKVal, colorReset)
+		fmt.Printf("   %s-> KHÔNG ĐỦ ĐIỀU KIỆN QUYẾT TOÁN: Số lượng thống kê đã bằng SL cần đạt (%.0f/%.0f).%s\n", colorBold+colorRed, maxTKVal, targetDetail.QuantityAfterAdj, colorReset)
+		fmt.Printf("   %s-> HỆ THỐNG TỪ CHỐI VÀ KHÔNG CHO PHÉP HẠ SẢN LƯỢNG NỮA! THAO TÁC BỊ CHẶN HOÀN TOÀN.%s\n\n", colorBold+colorRed, colorReset)
+		return
+	} else if maxTKVal > 0 && maxTKVal < targetDetail.QuantityAfterAdj {
+		fmt.Printf("\n%sℹ️  [RÀNG BUỘC THỐNG KÊ]:%s\n", colorBold+colorYellow, colorReset)
+		fmt.Printf("   ● Xưởng đã thống kê thực tế được: %s%.0f con%s (SL cần đạt hiện tại: %.0f)\n", colorBold+colorGreen, maxTKVal, colorReset, targetDetail.QuantityAfterAdj)
+		fmt.Printf("   ● Quy định: %sKHÔNG ĐƯỢC HẠ QUÁ %.0f%s! SL sau điều chỉnh tối thiểu phải là %s%.0f%s.\n",
+			colorBold+colorRed, maxTKVal, colorReset, colorBold+colorGreen, maxTKVal, colorReset)
+	}
+
+	// Nhập SL điều chỉnh với gợi ý thông minh dựa trên SL Max Thống Kê
+	suggestAdj := -targetDetail.QuantityProduce
+	if maxTKVal > 0 && maxTKVal < targetDetail.QuantityProduce {
+		suggestAdj = maxTKVal - targetDetail.QuantityProduce
+	}
+	fmt.Printf("\n%s1. Nhập Số Lượng Điều Chỉnh (QuantityAdj):%s\n", colorBold, colorReset)
+	fmt.Printf("   [Gợi ý hợp lệ]:\n")
+	if maxTKVal > 0 && maxTKVal < targetDetail.QuantityProduce {
+		fmt.Printf("   • Nhập %s%.0f%s : Chốt về đúng SL Max Thống Kê (%.0f con — Mức hạ tối đa cho phép)\n", colorGreen, maxTKVal-targetDetail.QuantityProduce, maxTKVal, colorReset)
+	} else if maxTKVal == 0 {
+		fmt.Printf("   • Nhập %s%.0f%s : Đưa SL sau Đ/C về 0 (Chưa có thống kê phát sinh)\n", colorYellow, -targetDetail.QuantityProduce, colorReset)
+	}
+	if maxPassTK > 0 && maxPassTK >= maxTKVal {
+		fmt.Printf("   • Nhập %s%.0f%s : Chốt theo Đạt Thống Kê (%.0f con)\n", colorGreen, maxPassTK-targetDetail.QuantityProduce, maxPassTK, colorReset)
+	}
+	fmt.Printf("   ❯ Nhập giá trị [Mặc định %.0f, Enter giữ nguyên]: ", suggestAdj)
 	inputAdj, _ := s.reader.ReadString('\n')
 	inputAdj = strings.TrimSpace(inputAdj)
-	adjVal := -targetDetail.QuantityProduce
+	adjVal := suggestAdj
 	if inputAdj != "" {
 		if v, err := strconv.ParseFloat(inputAdj, 64); err == nil {
 			adjVal = v
@@ -1234,6 +1382,16 @@ func (s *Shell) cmdSettle(args []string) {
 		if v, err := strconv.ParseFloat(inputAfter, 64); err == nil {
 			afterAdjVal = v
 		}
+	}
+
+	// Kiểm tra ràng buộc chặn dưới: Không được hạ quá số lượng đã thống kê
+	if maxTKVal > 0 && afterAdjVal < maxTKVal {
+		fmt.Printf("\n%s⛔ [TỪ CHỐI THỰC HIỆN — KHÔNG ĐỦ ĐIỀU KIỆN HẠ SẢN LƯỢNG]:%s\n", colorRed+colorBold, colorReset)
+		fmt.Printf("   ● Xưởng đã thống kê thực tế được : %s%.0f con%s\n", colorBold+colorYellow, maxTKVal, colorReset)
+		fmt.Printf("   ● Bạn đang yêu cầu hạ về          : %s%.0f con%s\n", colorRed, afterAdjVal, colorReset)
+		fmt.Printf("   %s-> LỖI RÀNG BUỘC: Không được hạ số lượng thấp hơn mức xưởng đã thống kê thực tế!%s\n", colorBold+colorRed, colorReset)
+		fmt.Printf("   %s-> Mức hạ tối đa chỉ được phép về: %.0f con. Hệ thống không cho phép hạ nữa!%s\n\n", colorBold+colorYellow, maxTKVal, colorReset)
+		return
 	}
 
 	// Nhập SL Bù hao / Đạt (QuantityPass)
@@ -1314,10 +1472,31 @@ func (s *Shell) cmdSettle(args []string) {
 		return
 	}
 
-	fmt.Printf("\r\033[K%s[✔] QUYẾT TOÁN THÀNH CÔNG (%v) — Cả 3 bước API Bravo ERP Gateway đã hoàn tất 100%%!%s\n",
+	fmt.Printf("\r\033[K%s[✔] QUYẾT TOÁN CÔNG ĐOẠN THÀNH CÔNG (%v) — Đã lưu điều chỉnh SL và định mức!%s\n",
 		colorGreen+colorBold, time.Since(startTime).Round(time.Millisecond), colorReset)
-	fmt.Printf("    ● Lệnh con    : %s%s%s (RowId: %s)\n", colorBold+colorCyan, targetDetail.DocNoDetail, colorReset, targetDetail.RowId)
-	fmt.Printf("    ● Trạng thái  : Đã lưu điều chỉnh SL và đóng quyết toán thành công.\n\n")
+	fmt.Printf("    ● Lệnh con    : %s%s%s (RowId: %s)\n\n", colorBold+colorCyan, targetDetail.DocNoDetail, colorReset, targetDetail.RowId)
+
+	// Tiếp tục tự động tìm kiếm và quyết toán toàn bộ Master Lệnh thao tác liên quan
+	fmt.Printf("%s[⟳] Đang tìm kiếm các Master Lệnh Thao Tác (WorkDocTT) liên quan tới '%s'...%s\n",
+		colorBold+colorCyan, targetDetail.DocNoDetail, colorReset)
+
+	stepResults, errStep := s.client.SettleAllWorkStepsOfProcess(targetDetail.DocNoDetail, targetDetail.RowId, param, 4)
+	if errStep != nil {
+		fmt.Printf("%s[!] Cảnh báo quyết toán Lệnh thao tác: %v%s\n\n", colorYellow, errStep, colorReset)
+	} else if len(stepResults) == 0 {
+		fmt.Printf("%s[i] Không tìm thấy Master Lệnh thao tác nào liên quan cần quyết toán.%s\n\n", colorDim, colorReset)
+	} else {
+		fmt.Printf("%s[✔] ĐÃ ĐỒNG BỘ VÀ QUYẾT TOÁN %d MASTER LỆNH THAO TÁC:%s\n", colorBold+colorGreen, len(stepResults), colorReset)
+		for _, sr := range stepResults {
+			if sr.Err != nil {
+				fmt.Printf("    %s[✘] Phiếu %s (Stt: %s): Lỗi: %v%s\n", colorRed, sr.MasterDocNo, sr.Stt, sr.Err, colorReset)
+			} else {
+				fmt.Printf("    %s[✔] Phiếu %s (Stt: %s): Đã cập nhật %d dòng thao tác & ghi chú '%s' (%v)%s\n",
+					colorGreen, sr.MasterDocNo, sr.Stt, sr.RowsUpdated, param.Note, sr.Duration.Round(time.Millisecond), colorReset)
+			}
+		}
+		fmt.Println()
+	}
 }
 
 
@@ -1409,16 +1588,9 @@ func (s *Shell) cmdMode(args []string) {
 	s.cfg.ClientMode = mode
 	if mode == "winform" {
 		s.cfg.AppName = "B10.10.9.1.1"
-		comp := os.Getenv("COMPUTERNAME")
-		if comp == "" {
-			comp = "DESKTOP-CHS6OSJ"
-		}
-		user := os.Getenv("USERNAME")
-		if user == "" {
-			user = "tuanhoang"
-		}
+		comp := config.GetSystemWsName()
 		s.cfg.WsName = comp
-		s.cfg.WsUser = user + "@" + comp
+		s.cfg.WsUser = config.GetSystemWsUser(comp)
 		s.cfg.ClientInfo = s.cfg.GetEffectiveClientInfo()
 	} else {
 		s.cfg.AppName = "Bravo Web 10.9.5.1"

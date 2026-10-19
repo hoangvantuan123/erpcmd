@@ -1,12 +1,12 @@
-# 🚀 BRAVO API CONNECTOR & MES DATA ENGINE (MESSYN CODEX CLI v2.7)
+# 🚀 BRAVO API CONNECTOR & MES DATA ENGINE (ERPSYN CODEX CLI v2.7)
 
-Ứng dụng viết bằng **Golang** tối ưu hóa hiệu năng và bảo mật, phục vụ kết nối các đầu API Bravo Gateway, tự động quản lý OAuth2 Token, tự động gọi API định kỳ 5 phút và lưu trữ toàn bộ dữ liệu vào SQLite cục bộ (`messyn_data.db`).
+Ứng dụng viết bằng **Golang** tối ưu hóa hiệu năng và bảo mật, phục vụ kết nối các đầu API Bravo Gateway, tự động quản lý OAuth2 Token, tự động gọi API định kỳ 5 phút và lưu trữ toàn bộ dữ liệu vào SQLite cục bộ (`erpsyn_data.db`).
 
 ## ✨ Tính năng nổi bật
 
 1. **Đăng nhập Tương tác Ngay khi Khởi chạy**:
-   - Khi chạy `messyn.exe`, ứng dụng sẽ yêu cầu người dùng tự nhập trực tiếp **Tên tài khoản** và **Mật khẩu** để xác thực với Bravo Gateway (không dùng bất kỳ tài khoản mặc định nào).
-   - Toàn bộ Token và các địa chỉ API được lưu tự động vào CSDL SQLite (`messyn_data.db`).
+   - Khi chạy `erpsyn.exe`, ứng dụng sẽ yêu cầu người dùng tự nhập trực tiếp **Tên tài khoản** và **Mật khẩu** để xác thực với Bravo Gateway (không dùng bất kỳ tài khoản mặc định nào).
+   - Toàn bộ Token và các địa chỉ API được lưu tự động vào CSDL SQLite (`erpsyn_data.db`).
 2. **Tiến trình Nền Tự động Gọi API Mỗi 5 Phút (Auto-Poll 5m)**:
    - Tự động gọi API giám sát: `https://bravo.goldsunpackaging.vn:5051/6e60af0b2cc4e2200d8c2ec545da3627`.
    - Đính kèm chính xác 16 HTTP Headers đặc thù của Bravo (`Bearer Token`, `branchcode: A01`, `fiscalyear: 2026`, `clientinfo`, `origin`, `referer`, `sec-ch-ua...`).
@@ -14,7 +14,7 @@
    - Báo thông báo trực tiếp lên CMD console kèm mã HTTP, độ trễ ms, và tóm tắt payload.
    - Ghi nhận lịch sử gọi vào bảng `api_logs` và nội dung payload vào bảng `synced_data` trong SQLite.
 3. **Hiệu năng & Tối ưu vượt trội**:
-   - Biên dịch thành 1 file nhị phân duy nhất `messyn.exe` (~15MB).
+   - Biên dịch thành 1 file nhị phân duy nhất `erpsyn.exe` (~15MB).
    - Tối ưu RAM (chỉ chiếm ~15MB RAM khi chạy).
    - Khởi động tức thì (< 0.05s), thuần Go Native, không GUI / không Web nặng nề.
 4. **Quản trị API & Lệnh sản xuất ngay trên Terminal**:
@@ -27,13 +27,13 @@
 
 Khởi chạy bằng cách nhấp đúp hoặc chạy trong CMD / PowerShell:
 ```bash
-.\messyn.exe
+.\erpsyn.exe
 ```
 
 Quy trình khởi động:
 ```text
 ╭──────────────────────────────────────────────────────────────────────────────╮
-│   🔐 ĐĂNG NHẬP HỆ THỐNG BRAVO ERP / MES - GOLDSUN PACKAGING                 │
+│   🔐 ĐĂNG NHẬP HỆ THỐNG BRAVO ERP - GOLDSUN PACKAGING                 │
 │   Vui lòng nhập Tên tài khoản và Mật khẩu để xác thực truy cập hệ thống:     │
 ╰──────────────────────────────────────────────────────────────────────────────╯
 
@@ -41,9 +41,6 @@ Mã tài khoản / Username ❯ <nhập tài khoản của bạn>
 Mật khẩu / Password ❯ <nhập mật khẩu của bạn>
 
 [✔] ĐĂNG NHẬP THÀNH CÔNG! (257ms)
-    ● Token: eyJhbGciOiJSUzI1NiIsImtpZ... (Thời hạn: 1800 giây ~ 0.5 giờ)
-    ● SQLite DB: Đã lưu trữ Token và các Endpoint vào file `messyn_data.db`
-    ● Tự động gọi API: Tiến trình nền định kỳ 5 phút (300s) đã được kích hoạt!
 ```
 
 Mỗi 5 phút, tiến trình nền tự động báo lên CMD:
@@ -88,7 +85,7 @@ codex [user] ❯
 
 ---
 
-## 🗄️ Cấu trúc CSDL SQLite (`messyn_data.db`)
+## 🗄️ Cấu trúc CSDL SQLite (`erpsyn_data.db`)
 
 1. **`auth_tokens`**: Lưu trữ lịch sử các phiên cấp OAuth2 Bearer Token và thời điểm hết hạn.
 2. **`api_logs`**: Nhật ký toàn bộ các lượt gọi API (HTTP Status Code, Endpoint, tóm tắt JSON, lỗi).
@@ -102,17 +99,15 @@ codex [user] ❯
 
 Hệ thống đã được đóng gói thành một file nhị phân **Windows Desktop Native duy nhất**:
 
-* **File ứng dụng**: [`MESSYN-Desktop.exe`](file:///c:/Users/tuanhoang/Desktop/MESSYN/MESSYN-Desktop.exe) (~10 MB)
+* **File ứng dụng**: `ERPSYN-Desktop.exe` (~10 MB)
 * **Cách sử dụng**:
-  - Chỉ cần **nhấp đúp trực tiếp vào `MESSYN-Desktop.exe`**.
+  - Chỉ cần **nhấp đúp trực tiếp vào `ERPSYN-Desktop.exe`**.
   - Ứng dụng sẽ mở cửa sổ Desktop độc lập ngay lập tức:
     - **Không có cửa sổ đen CMD console**.
     - **Không cần mở trình duyệt web (không tab, không thanh URL)**.
     - Toàn bộ giao diện Herdr bo vuông và dữ liệu SQLite được đóng gói hoàn toàn bên trong file `.exe`.
 * **Lệnh build lại phần mềm khi sửa code**:
-  - Nhấp đúp vào [`build-desktop.bat`](file:///c:/Users/tuanhoang/Desktop/MESSYN/build-desktop.bat) hoặc chạy:
+  - Nhấp đúp vào `build-desktop.bat` hoặc chạy:
   ```bash
-  go build -ldflags "-H windowsgui -s -w" -o MESSYN-Desktop.exe ./cmd/gui
+  go build -ldflags "-H windowsgui -s -w" -o ERPSYN-Desktop.exe ./cmd/gui
   ```
-
-

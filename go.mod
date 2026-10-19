@@ -1,4 +1,4 @@
-module messyn
+module erpsyn
 
 go 1.25.4
 

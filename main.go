@@ -4,10 +4,10 @@ import (
 	"log"
 	"os"
 
-	"messyn/api"
-	"messyn/cli"
-	"messyn/config"
-	"messyn/db"
+	"erpsyn/api"
+	"erpsyn/cli"
+	"erpsyn/config"
+	"erpsyn/db"
 )
 
 func main() {

@@ -45,13 +45,18 @@ func (c *Client) SettleWorkProcess(masterStt string, masterDocNo string, rowIdCD
 		req.Header.Set("Authorization", "Bearer "+token)
 		req.Header.Set("Content-Type", "application/json")
 		req.Header.Set("Accept", "*/*")
+		req.Header.Set("Accept-Language", "vi-VN,vi;q=0.9,en;q=0.8")
 		req.Header.Set("clientinfo", clientInfo)
 		req.Header.Set("BranchCode", c.cfg.BranchCode)
 		req.Header.Set("FiscalYear", c.cfg.FiscalYear)
 		req.Header.Set("Lang", "0")
-		req.Header.Set("Referer", c.cfg.Referer)
-		req.Header.Set("Origin", c.cfg.Origin)
 		if c.cfg.ClientMode == "web" {
+			if c.cfg.Referer != "" {
+				req.Header.Set("Referer", c.cfg.Referer)
+			}
+			if c.cfg.Origin != "" {
+				req.Header.Set("Origin", c.cfg.Origin)
+			}
 			req.Header.Set("sec-ch-ua-platform", `"Windows"`)
 			req.Header.Set("sec-ch-ua", `"Google Chrome";v="155", "Chromium";v="155", "Not(A:Brand";v="24"`)
 			req.Header.Set("sec-ch-ua-mobile", "?0")
@@ -131,7 +136,7 @@ func (c *Client) SettleWorkProcess(masterStt string, masterDocNo string, rowIdCD
 						for ci, c := range clns {
 							if cm, ok := c.(map[string]interface{}); ok {
 								if cm["cln"] == "DocDate" && ci < len(crt) && crt[ci] != nil {
-									masterDocDate = fmt.Sprintf("%v", crt[ci])
+									masterDocDate = fmt.Sprintf("%v", normalizeBravoDateTime(crt[ci]))
 									break
 								}
 							}
@@ -442,12 +447,16 @@ func buildStandardSettleTables(rtvTableMap map[string]map[string]interface{}, ma
 		clns, _ := sTbl["cln"].([]interface{})
 		colCount := len(clns)
 
-		// Xây dựng danh sách cột của schema -> index
+		// Xây dựng danh sách cột của schema -> index và dtp
 		sColMap := make(map[string]int)
+		sColDtpMap := make(map[string]int)
 		for i, c := range clns {
 			if cm, ok := c.(map[string]interface{}); ok {
 				if name, ok := cm["cln"].(string); ok {
 					sColMap[name] = i
+					if dtp, okDtp := cm["dtp"].(float64); okDtp {
+						sColDtpMap[name] = int(dtp)
+					}
 				}
 			}
 		}
@@ -480,8 +489,12 @@ func buildStandardSettleTables(rtvTableMap map[string]map[string]interface{}, ma
 				if rCrt, ok := r0["crt"].([]interface{}); ok {
 					for colName, sIdx := range sColMap {
 						if rIdx, found := rColMap[colName]; found && rIdx < len(rCrt) {
-							crt[sIdx] = rCrt[rIdx]
-							ori[sIdx] = rCrt[rIdx]
+							val := rCrt[rIdx]
+							if sColDtpMap[colName] == 16 {
+								val = normalizeBravoDateTime(val)
+							}
+							crt[sIdx] = val
+							ori[sIdx] = val
 						}
 					}
 				}
@@ -499,6 +512,14 @@ func buildStandardSettleTables(rtvTableMap map[string]map[string]interface{}, ma
 			if idx, ok := sColMap["IsCancelled"]; ok {
 				crt[idx] = 0
 				ori[idx] = 0
+			}
+			if idx, ok := sColMap["DocDate"]; ok && crt[idx] != nil {
+				crt[idx] = normalizeBravoDateTime(crt[idx])
+				ori[idx] = normalizeBravoDateTime(ori[idx])
+			}
+			if idx, ok := sColMap["DocDate2"]; ok && crt[idx] != nil {
+				crt[idx] = normalizeBravoDateTime(crt[idx])
+				ori[idx] = normalizeBravoDateTime(ori[idx])
 			}
 
 			sTbl["rws"] = []interface{}{
@@ -528,8 +549,12 @@ func buildStandardSettleTables(rtvTableMap map[string]map[string]interface{}, ma
 				if fmt.Sprintf("%v", rCrt[rowIdIdx]) == targetRowId {
 					for colName, sIdx := range sColMap {
 						if rIdx, f := rColMap[colName]; f && rIdx < len(rCrt) {
-							crt[sIdx] = rCrt[rIdx]
-							ori[sIdx] = rCrt[rIdx]
+							val := rCrt[rIdx]
+							if sColDtpMap[colName] == 16 {
+								val = normalizeBravoDateTime(val)
+							}
+							crt[sIdx] = val
+							ori[sIdx] = val
 						}
 					}
 					break
@@ -591,8 +616,12 @@ func buildStandardSettleTables(rtvTableMap map[string]map[string]interface{}, ma
 				if fmt.Sprintf("%v", rCrt[idIdx]) == targetRowId {
 					for colName, sIdx := range sColMap {
 						if rIdx, f := rColMap[colName]; f && rIdx < len(rCrt) {
-							crt[sIdx] = rCrt[rIdx]
-							ori[sIdx] = rCrt[rIdx]
+							val := rCrt[rIdx]
+							if sColDtpMap[colName] == 16 {
+								val = normalizeBravoDateTime(val)
+							}
+							crt[sIdx] = val
+							ori[sIdx] = val
 						}
 					}
 					break
@@ -637,5 +666,25 @@ func buildStandardSettleTables(rtvTableMap map[string]map[string]interface{}, ma
 	}
 
 	return resultTables
+}
+
+// normalizeBravoDateTime chuẩn hóa các trường thời gian sang định dạng chuẩn Bravo ERP (ISO 8601 kèm .0)
+func normalizeBravoDateTime(val interface{}) interface{} {
+	if val == nil {
+		return nil
+	}
+	s := strings.TrimSpace(fmt.Sprintf("%v", val))
+	if s == "" || s == "<nil>" {
+		return nil
+	}
+	// Nếu có dạng yyyy-MM-ddTHH:mm:ss (độ dài 19) -> thêm .0
+	if len(s) == 19 && strings.Contains(s, "T") && !strings.Contains(s, ".") {
+		return s + ".0"
+	}
+	// Nếu có dạng yyyy-MM-dd (độ dài 10) -> thêm T00:00:00.0
+	if len(s) == 10 && strings.Count(s, "-") == 2 {
+		return s + "T00:00:00.0"
+	}
+	return s
 }
 

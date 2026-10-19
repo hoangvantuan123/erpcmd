@@ -1,4 +1,4 @@
-// web/server.js - Lightweight backend for MESSYN / Herdr Dashboard
+// web/server.js - Lightweight backend for ERPSYN / Herdr Dashboard
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
@@ -9,9 +9,19 @@ const https = require('https');
 const querystring = require('querystring');
 
 const PORT = process.env.PORT || 8080;
-const DB_PATH = path.resolve(__dirname, '..', 'messyn_data.db');
+const DB_PATH = path.resolve(__dirname, '..', 'erpsyn_data.db');
 const CONFIG_PATH = path.resolve(__dirname, '..', 'config.json');
-const HOSTNAME = os.hostname() || 'DESKTOP-CHS6OSJ';
+const HOSTNAME = process.env.COMPUTERNAME || os.hostname() || 'localhost';
+const USERNAME = process.env.USERNAME || process.env.USER || 'user';
+
+function getDefaultClientInfo(cfg) {
+  if (cfg && cfg.client_info && cfg.client_info.trim() !== '') {
+    return cfg.client_info;
+  }
+  const comp = process.env.COMPUTERNAME || os.hostname() || 'localhost';
+  const user = process.env.USERNAME || process.env.USER || 'user';
+  return `AppName=B10.10.9.1.1;WsName=${comp};WsUser=${user}@${comp}`;
+}
 
 // Helper: Tự động lấy Bearer Token tươi mới từ Bravo Gateway OAuth2
 function getFreshBravoToken() {
@@ -20,6 +30,7 @@ function getFreshBravoToken() {
     if (fs.existsSync(CONFIG_PATH)) {
       try { config = JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf-8')); } catch(e){}
     }
+    const cInfo = getDefaultClientInfo(config);
     const postData = querystring.stringify({
       client_id: config.client_id || 'c52bd596-07ff-4329-a640-67f41a51a90e',
       client_secret: config.client_secret || 'DC86276E4BF54018BE9EC05650681914',
@@ -29,22 +40,26 @@ function getFreshBravoToken() {
       scope: config.scope || 'ApiGateway offline_access',
       username: config.username || 'it_tuanhv',
       password: config.password || 'Tuan@123',
-      clientinfo: config.client_info || 'AppName=B10.10.9.1.1;WsName=DESKTOP-CHS6OSJ;WsUser=tuanhoang@DESKTOP-CHS6OSJ'
+      clientinfo: cInfo
     });
+
+    const loginHeaders = {
+      'Content-Type': 'application/x-www-form-urlencoded',
+      'Accept': 'application/json, text/plain, */*',
+      'clientinfo': cInfo,
+      'branchcode': config.branch_code || 'A01',
+      'fiscalyear': config.fiscal_year || '2026',
+      'lang': '0'
+    };
+    if (config.client_mode === 'web') {
+      if (config.origin) loginHeaders['origin'] = config.origin;
+      if (config.referer) loginHeaders['Referer'] = config.referer;
+    }
 
     const lReq = https.request('https://bravo.goldsunpackaging.vn:5051/fa837234b0b27bc02365a940995bdc24', {
       method: 'POST',
       rejectUnauthorized: false,
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-        'Accept': 'application/json, text/plain, */*',
-        'clientinfo': config.client_info || 'AppName=B10.10.9.1.1;WsName=DESKTOP-CHS6OSJ;WsUser=tuanhoang@DESKTOP-CHS6OSJ',
-        'branchcode': 'A01',
-        'fiscalyear': '2026',
-        'lang': '0',
-        'origin': 'https://bravo.goldsunpackaging.vn:5052',
-        'Referer': 'https://bravo.goldsunpackaging.vn:5052/'
-      }
+      headers: loginHeaders
     }, (lRes) => {
       let lData = '';
       lRes.on('data', d => lData += d);
@@ -67,23 +82,32 @@ function getFreshBravoToken() {
 
 function doBravoPost(url, payload, tok) {
   return new Promise((resolve) => {
+    let config = {};
+    if (fs.existsSync(CONFIG_PATH)) {
+      try { config = JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf-8')); } catch(e){}
+    }
+    const headers = {
+      'Authorization': `Bearer ${tok}`,
+      'Content-Type': 'application/json',
+      'Accept': 'application/json, text/plain, */*',
+      'BranchCode': config.branch_code || 'A01',
+      'FiscalYear': config.fiscal_year || '2026',
+      'Lang': '0',
+      'clientinfo': getDefaultClientInfo(config)
+    };
+    if (config.client_mode === 'web') {
+      if (config.referer) headers['Referer'] = config.referer;
+      if (config.origin) headers['origin'] = config.origin;
+      headers['sec-ch-ua-platform'] = '"Windows"';
+      headers['sec-ch-ua'] = '"Google Chrome";v="155", "Chromium";v="155", "Not(A:Brand";v="24"';
+      headers['sec-ch-ua-mobile'] = '?0';
+      headers['User-Agent'] = config.user_agent || 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/155.0.0.0 Safari/537.36';
+    }
+
     const apiReq = https.request(url, {
       method: 'POST',
       rejectUnauthorized: false,
-      headers: {
-        'Authorization': `Bearer ${tok}`,
-        'Content-Type': 'application/json',
-        'Accept': 'application/json, text/plain, */*',
-        'BranchCode': 'A01',
-        'FiscalYear': '2026',
-        'Lang': '0',
-        'Referer': 'https://bravo.goldsunpackaging.vn:5052/',
-        'clientinfo': 'AppName=Bravo Web 10.9.5.1;WsName=42.114.187.195',
-        'sec-ch-ua-platform': '"Windows"',
-        'sec-ch-ua': '"Google Chrome";v="155", "Chromium";v="155", "Not(A:Brand";v="24"',
-        'sec-ch-ua-mobile': '?0',
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/155.0.0.0 Safari/537.36'
-      },
+      headers: headers,
       timeout: 15000
     }, (resApi) => {
       let resData = '';
@@ -387,22 +411,26 @@ const server = http.createServer(async (req, res) => {
               scope: config.scope || 'ApiGateway offline_access',
               username: config.username || 'it_tuanhv',
               password: config.password || 'Tuan@123',
-              clientinfo: config.client_info || 'AppName=B10.10.9.1.1;WsName=DESKTOP-CHS6OSJ;WsUser=tuanhoang@DESKTOP-CHS6OSJ'
+              clientinfo: getDefaultClientInfo(config)
             });
+
+            const tokLoginHeaders = {
+              'Content-Type': 'application/x-www-form-urlencoded',
+              'Accept': 'application/json, text/plain, */*',
+              'clientinfo': getDefaultClientInfo(config),
+              'branchcode': config.branch_code || 'A01',
+              'fiscalyear': config.fiscal_year || '2026',
+              'lang': '0'
+            };
+            if (config.client_mode === 'web') {
+              if (config.origin) tokLoginHeaders['origin'] = config.origin;
+              if (config.referer) tokLoginHeaders['Referer'] = config.referer;
+            }
 
             const lReq = https.request('https://bravo.goldsunpackaging.vn:5051/fa837234b0b27bc02365a940995bdc24', {
               method: 'POST',
               rejectUnauthorized: false,
-              headers: {
-                'Content-Type': 'application/x-www-form-urlencoded',
-                'Accept': 'application/json, text/plain, */*',
-                'clientinfo': config.client_info || 'AppName=B10.10.9.1.1;WsName=DESKTOP-CHS6OSJ;WsUser=tuanhoang@DESKTOP-CHS6OSJ',
-                'branchcode': 'A01',
-                'fiscalyear': '2026',
-                'lang': '0',
-                'origin': 'https://bravo.goldsunpackaging.vn:5052',
-                'Referer': 'https://bravo.goldsunpackaging.vn:5052/'
-              }
+              headers: tokLoginHeaders
             }, (lRes) => {
               let lData = '';
               lRes.on('data', d => lData += d);
@@ -458,20 +486,30 @@ const server = http.createServer(async (req, res) => {
             const apiReq = https.request(targetUrl, {
               method: 'POST',
               rejectUnauthorized: false,
-              headers: {
-                'Authorization': `Bearer ${tok}`,
-                'Content-Type': 'application/json',
-                'Accept': 'application/json, text/plain, */*',
-                'BranchCode': 'A01',
-                'FiscalYear': '2026',
-                'Lang': '0',
-                'Referer': 'https://bravo.goldsunpackaging.vn:5052/',
-                'clientinfo': 'AppName=Bravo Web 10.9.5.1;WsName=42.114.187.195',
-                'sec-ch-ua-platform': '"Windows"',
-                'sec-ch-ua': '"Google Chrome";v="155", "Chromium";v="155", "Not(A:Brand";v="24"',
-                'sec-ch-ua-mobile': '?0',
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/155.0.0.0 Safari/537.36'
-              },
+              headers: (() => {
+                let srvCfg = {};
+                if (fs.existsSync(CONFIG_PATH)) {
+                  try { srvCfg = JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf-8')); } catch(e){}
+                }
+                const h = {
+                  'Authorization': `Bearer ${tok}`,
+                  'Content-Type': 'application/json',
+                  'Accept': 'application/json, text/plain, */*',
+                  'BranchCode': srvCfg.branch_code || 'A01',
+                  'FiscalYear': srvCfg.fiscal_year || '2026',
+                  'Lang': '0',
+                  'clientinfo': getDefaultClientInfo(srvCfg)
+                };
+                if (srvCfg.client_mode === 'web') {
+                  if (srvCfg.referer) h['Referer'] = srvCfg.referer;
+                  if (srvCfg.origin) h['origin'] = srvCfg.origin;
+                  h['sec-ch-ua-platform'] = '"Windows"';
+                  h['sec-ch-ua'] = '"Google Chrome";v="155", "Chromium";v="155", "Not(A:Brand";v="24"';
+                  h['sec-ch-ua-mobile'] = '?0';
+                  h['User-Agent'] = srvCfg.user_agent || 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/155.0.0.0 Safari/537.36';
+                }
+                return h;
+              })(),
               timeout: 12000
             }, (resApi) => {
               let resData = '';
@@ -1055,5 +1093,5 @@ const server = http.createServer(async (req, res) => {
 });
 
 server.listen(PORT, () => {
-  console.log(`[MESSYN Herdr Web] Server running at http://localhost:${PORT}/`);
+  console.log(`[ERPSYN Herdr Web] Server running at http://localhost:${PORT}/`);
 });

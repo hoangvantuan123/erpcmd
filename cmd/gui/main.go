@@ -23,7 +23,7 @@ import (
 	"golang.org/x/sys/windows"
 	_ "modernc.org/sqlite"
 
-	"messyn/config"
+	"erpsyn/config"
 )
 
 //go:embed web/*
@@ -73,7 +73,7 @@ func main() {
 	// 2. Mở CSDL SQLite cục bộ
 	dbPath := cfg.DBPath
 	if dbPath == "" {
-		dbPath = "messyn_data.db"
+		dbPath = "erpsyn_data.db"
 	}
 
 	dbConn, err := sql.Open("sqlite", dbPath)
@@ -168,7 +168,7 @@ func main() {
 	hwnd := uintptr(w.Window())
 
 	// Đặt kích thước trước khi điều chỉnh style
-	w.SetTitle("MESSYN — Hệ Thống Điều Hành Sản Xuất MES")
+	w.SetTitle("ERPSYN — Hệ Thống Điều Hành Sản Xuất MES")
 	w.SetSize(1480, 900, webview2.HintNone)
 
 	// Đặt chổi nền HWND màu đen BLACK_BRUSH (4) triệt tiêu hoàn toàn khoảng trắng nháy hoặc viền trắng trên header
@@ -214,7 +214,7 @@ func main() {
 			pagePath = "/settings.html"
 		}
 		if title == "" {
-			title = "MESSYN — Cửa Sổ Cấu Hình & Nghiệp Vụ Riêng Biệt"
+			title = "ERPSYN — Cửa Sổ Cấu Hình & Nghiệp Vụ Riêng Biệt"
 		}
 		if width <= 0 {
 			width = 960
@@ -280,7 +280,7 @@ func (s *Server) fetchBravoToken() string {
 	form.Set("scope", "ApiGateway offline_access")
 	form.Set("username", "it_tuanhv")
 	form.Set("password", "Tuan@123")
-	form.Set("clientinfo", "AppName=B10.10.9.1.1;WsName=DESKTOP-CHS6OSJ;WsUser=tuanhoang@DESKTOP-CHS6OSJ")
+	form.Set("clientinfo", s.cfg.GetEffectiveClientInfo())
 
 	loginReq, errL := http.NewRequest("POST", "https://bravo.goldsunpackaging.vn:5051/fa837234b0b27bc02365a940995bdc24", strings.NewReader(form.Encode()))
 	if errL != nil {
@@ -288,12 +288,18 @@ func (s *Server) fetchBravoToken() string {
 	}
 	loginReq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	loginReq.Header.Set("Accept", "application/json, text/plain, */*")
-	loginReq.Header.Set("clientinfo", "AppName=B10.10.9.1.1;WsName=DESKTOP-CHS6OSJ;WsUser=tuanhoang@DESKTOP-CHS6OSJ")
-	loginReq.Header.Set("branchcode", "A01")
-	loginReq.Header.Set("fiscalyear", "2026")
+	loginReq.Header.Set("clientinfo", s.cfg.GetEffectiveClientInfo())
+	loginReq.Header.Set("branchcode", s.cfg.BranchCode)
+	loginReq.Header.Set("fiscalyear", s.cfg.FiscalYear)
 	loginReq.Header.Set("lang", "0")
-	loginReq.Header.Set("origin", "https://bravo.goldsunpackaging.vn:5052")
-	loginReq.Header.Set("Referer", "https://bravo.goldsunpackaging.vn:5052/")
+	if s.cfg.ClientMode == "web" {
+		if s.cfg.Origin != "" {
+			loginReq.Header.Set("origin", s.cfg.Origin)
+		}
+		if s.cfg.Referer != "" {
+			loginReq.Header.Set("Referer", s.cfg.Referer)
+		}
+	}
 
 	respL, errL2 := httpClient.Do(loginReq)
 	if errL2 == nil && respL != nil {
@@ -337,9 +343,12 @@ func (s *Server) handleStatus(w http.ResponseWriter, r *http.Request) {
 			Scan(&token.ID, &token.Username, &token.Token, &token.ExpiresAt)
 	}
 
-	hostname, _ := os.Hostname()
+	hostname := s.cfg.WsName
 	if hostname == "" {
-		hostname = "DESKTOP-CHS6OSJ"
+		hostname = os.Getenv("COMPUTERNAME")
+	}
+	if hostname == "" {
+		hostname, _ = os.Hostname()
 	}
 
 	resp := map[string]interface{}{
@@ -388,15 +397,22 @@ func (s *Server) handleWorkOrders(w http.ResponseWriter, r *http.Request) {
 		httpReq.Header.Set("Authorization", "Bearer "+tok)
 		httpReq.Header.Set("Content-Type", "application/json")
 		httpReq.Header.Set("Accept", "application/json, text/plain, */*")
-		httpReq.Header.Set("BranchCode", "A01")
-		httpReq.Header.Set("FiscalYear", "2026")
+		httpReq.Header.Set("BranchCode", s.cfg.BranchCode)
+		httpReq.Header.Set("FiscalYear", s.cfg.FiscalYear)
 		httpReq.Header.Set("Lang", "0")
-		httpReq.Header.Set("Referer", "https://bravo.goldsunpackaging.vn:5052/")
-		httpReq.Header.Set("clientinfo", "AppName=Bravo Web 10.9.5.1;WsName=42.114.187.195")
-		httpReq.Header.Set("sec-ch-ua-platform", `"Windows"`)
-		httpReq.Header.Set("sec-ch-ua", `"Google Chrome";v="155", "Chromium";v="155", "Not(A:Brand";v="24"`)
-		httpReq.Header.Set("sec-ch-ua-mobile", "?0")
-		httpReq.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/155.0.0.0 Safari/537.36")
+		httpReq.Header.Set("clientinfo", s.cfg.GetEffectiveClientInfo())
+		if s.cfg.ClientMode == "web" {
+			if s.cfg.Referer != "" {
+				httpReq.Header.Set("Referer", s.cfg.Referer)
+			}
+			if s.cfg.Origin != "" {
+				httpReq.Header.Set("Origin", s.cfg.Origin)
+			}
+			httpReq.Header.Set("sec-ch-ua-platform", `"Windows"`)
+			httpReq.Header.Set("sec-ch-ua", `"Google Chrome";v="155", "Chromium";v="155", "Not(A:Brand";v="24"`)
+			httpReq.Header.Set("sec-ch-ua-mobile", "?0")
+			httpReq.Header.Set("User-Agent", s.cfg.UserAgent)
+		}
 
 		r, e := httpClient.Do(httpReq)
 		if e != nil {
@@ -627,15 +643,22 @@ func (s *Server) handleWorkOrderDetail(w http.ResponseWriter, r *http.Request) {
 		req.Header.Set("Authorization", "Bearer "+tok)
 		req.Header.Set("Content-Type", "application/json")
 		req.Header.Set("Accept", "application/json, text/plain, */*")
-		req.Header.Set("BranchCode", "A01")
-		req.Header.Set("FiscalYear", "2026")
+		req.Header.Set("BranchCode", s.cfg.BranchCode)
+		req.Header.Set("FiscalYear", s.cfg.FiscalYear)
 		req.Header.Set("Lang", "0")
-		req.Header.Set("Referer", "https://bravo.goldsunpackaging.vn:5052/")
-		req.Header.Set("clientinfo", "AppName=Bravo Web 10.9.5.1;WsName=42.114.187.195")
-		req.Header.Set("sec-ch-ua-platform", `"Windows"`)
-		req.Header.Set("sec-ch-ua", `"Google Chrome";v="155", "Chromium";v="155", "Not(A:Brand";v="24"`)
-		req.Header.Set("sec-ch-ua-mobile", "?0")
-		req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/155.0.0.0 Safari/537.36")
+		req.Header.Set("clientinfo", s.cfg.GetEffectiveClientInfo())
+		if s.cfg.ClientMode == "web" {
+			if s.cfg.Referer != "" {
+				req.Header.Set("Referer", s.cfg.Referer)
+			}
+			if s.cfg.Origin != "" {
+				req.Header.Set("Origin", s.cfg.Origin)
+			}
+			req.Header.Set("sec-ch-ua-platform", `"Windows"`)
+			req.Header.Set("sec-ch-ua", `"Google Chrome";v="155", "Chromium";v="155", "Not(A:Brand";v="24"`)
+			req.Header.Set("sec-ch-ua-mobile", "?0")
+			req.Header.Set("User-Agent", s.cfg.UserAgent)
+		}
 		res, errDo := httpClient.Do(req)
 		if errDo != nil {
 			return nil, nil, errDo
@@ -1010,15 +1033,22 @@ func (s *Server) handleWorkOrdersBatchSearch(w http.ResponseWriter, r *http.Requ
 		httpReq.Header.Set("Authorization", "Bearer "+bearerToken)
 		httpReq.Header.Set("Content-Type", "application/json")
 		httpReq.Header.Set("Accept", "application/json, text/plain, */*")
-		httpReq.Header.Set("BranchCode", "A01")
-		httpReq.Header.Set("FiscalYear", "2026")
+		httpReq.Header.Set("BranchCode", s.cfg.BranchCode)
+		httpReq.Header.Set("FiscalYear", s.cfg.FiscalYear)
 		httpReq.Header.Set("Lang", "0")
-		httpReq.Header.Set("Referer", "https://bravo.goldsunpackaging.vn:5052/")
-		httpReq.Header.Set("clientinfo", "AppName=Bravo Web 10.9.5.1;WsName=42.114.187.195")
-		httpReq.Header.Set("sec-ch-ua-platform", `"Windows"`)
-		httpReq.Header.Set("sec-ch-ua", `"Google Chrome";v="155", "Chromium";v="155", "Not(A:Brand";v="24"`)
-		httpReq.Header.Set("sec-ch-ua-mobile", "?0")
-		httpReq.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/155.0.0.0 Safari/537.36")
+		httpReq.Header.Set("clientinfo", s.cfg.GetEffectiveClientInfo())
+		if s.cfg.ClientMode == "web" {
+			if s.cfg.Referer != "" {
+				httpReq.Header.Set("Referer", s.cfg.Referer)
+			}
+			if s.cfg.Origin != "" {
+				httpReq.Header.Set("Origin", s.cfg.Origin)
+			}
+			httpReq.Header.Set("sec-ch-ua-platform", `"Windows"`)
+			httpReq.Header.Set("sec-ch-ua", `"Google Chrome";v="155", "Chromium";v="155", "Not(A:Brand";v="24"`)
+			httpReq.Header.Set("sec-ch-ua-mobile", "?0")
+			httpReq.Header.Set("User-Agent", s.cfg.UserAgent)
+		}
 
 		startTime := time.Now()
 		resp, errDo := client.Do(httpReq)

@@ -142,7 +142,9 @@ func InitDB(dbPath string) (*DB, error) {
 		('editor_load', 'https://bravo.goldsunpackaging.vn:5051/6642f8863ff4d6c5d73112f0e3ef5491', 'POST', 'Đọc trạng thái & timestamp hiện thời của chứng từ'),
 		('save_edit', 'https://bravo.goldsunpackaging.vn:5051/ce49c21a2c25c83cbcb115432b1a9685', 'POST', 'Lưu điều chỉnh số lượng và chốt đóng quyết toán'),
 		('calc_norm', 'https://bravo.goldsunpackaging.vn:5051/5898ea70fecc610b57010cad18694bb1', 'POST', 'Thực thi Stored Procedure usp_B30WorkProcessDetailTT_Cal_Norm tính lại định mức'),
-		('commit_confirm', 'https://bravo.goldsunpackaging.vn:5051/6642f8863ff4d6c5d73112f0e3ef5491', 'POST', 'Commit và xác nhận hoàn tất quyết toán')
+		('commit_confirm', 'https://bravo.goldsunpackaging.vn:5051/6642f8863ff4d6c5d73112f0e3ef5491', 'POST', 'Commit và xác nhận hoàn tất quyết toán'),
+		('doc_process', 'https://bravo.goldsunpackaging.vn:5051/d7952b69f7aafd7d3db1d2bd8969aac4', 'POST', 'Kiểm tra quy trình chứng từ usp_B20DocProcess_GetData'),
+		('step_get_detail', 'https://bravo.goldsunpackaging.vn:5051/1cc41a997051d44ade62e9e875a6d2ac', 'POST', 'Lấy chi tiết thao tác usp_B30WorkStep_GetDetail')
 		ON CONFLICT(step_key) DO UPDATE SET endpoint_url=excluded.endpoint_url, description=excluded.description;
 	`)
 

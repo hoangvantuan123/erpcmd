@@ -1,7 +1,7 @@
 {
-  "name": "messyn",
+  "name": "erpsyn",
   "version": "1.0.0",
-  "description": "Ứng dụng viết bằng **Golang** tối ưu hóa hiệu năng và bảo mật, phục vụ kết nối các đầu API Bravo Gateway, tự động quản lý OAuth2 Token, tự động gọi API định kỳ 5 phút và lưu trữ toàn bộ dữ liệu vào SQLite cục bộ (`messyn_data.db`).",
+  "description": "CMD ERP SYNC.",
   "main": "populate_db.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"

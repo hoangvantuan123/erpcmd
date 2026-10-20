@@ -1,12 +1,20 @@
-import React, { useState, useEffect } from 'react'
+import React, { lazy, Suspense, useState, useEffect } from 'react'
 import ReactDOM from 'react-dom/client'
-import App from './App'
-import Login from './Login'
-import SettingsWindow from './components/Config/SettingsWindow'
-import StandaloneViewCanvas from './components/Editor/StandaloneViewCanvas'
-import ErrorBoundary from './components/Common/ErrorBoundary'
-import DevConsoleModal from './components/Common/DevConsoleModal'
+import ErrorBoundary from '@/shared/runtime/ErrorBoundary'
+import DevConsoleModal from '@/shared/runtime/DevConsoleModal'
+import { getSystemStatus } from '@/features/system/api/systemApi'
 import './index.css'
+
+const App = lazy(() => import('@/app/App'))
+const Login = lazy(() => import('@/features/auth/components/Login'))
+const SettingsWindow = lazy(() => import('@/features/settings/components/Config/SettingsWindow'))
+const StandaloneViewCanvas = lazy(() => import('@/app/shell/editor/Editor/StandaloneViewCanvas'))
+
+const PageLoading = () => (
+  <div className="h-screen w-screen flex items-center justify-center bg-white text-xs text-slate-500 dark:bg-black dark:text-slate-400">
+    Đang tải giao diện…
+  </div>
+)
 
 const urlParams = new URLSearchParams(window.location.search)
 const windowType = urlParams.get('window')
@@ -19,13 +27,12 @@ const DesktopApp = () => {
 
   useEffect(() => {
     // Check session validity with Go backend SQLite cache
-    fetch('/api/status')
+    getSystemStatus()
       .then((res) => res.json())
       .then((data) => {
         if (data.success && data.is_token_valid) {
           localStorage.setItem('erpsyn-authenticated', 'true')
           setAuthenticated(true)
-          fetch('/api/window/main', { method: 'POST' }).catch(() => {})
         } else if (data.success && !data.is_token_valid) {
           localStorage.removeItem('erpsyn-authenticated')
           setAuthenticated(false)
@@ -56,13 +63,15 @@ const Root = () => {
 
   return (
     <ErrorBoundary>
-      {windowType === 'settings' ? (
-        <SettingsWindow />
-      ) : windowType === 'view' ? (
-        <StandaloneViewCanvas viewId={viewId} />
-      ) : (
-        <DesktopApp />
-      )}
+      <Suspense fallback={<PageLoading />}>
+        {windowType === 'settings' ? (
+          <SettingsWindow />
+        ) : windowType === 'view' ? (
+          <StandaloneViewCanvas viewId={viewId} />
+        ) : (
+          <DesktopApp />
+        )}
+      </Suspense>
 
       {/* In-app developer console accessible via F12 anytime */}
       <DevConsoleModal isOpen={showConsole} onClose={() => setShowConsole(false)} />

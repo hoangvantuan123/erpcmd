@@ -7,7 +7,24 @@ export default {
   darkMode: 'class',
   theme: {
     extend: {
+      fontFamily: {
+        sans: ['Inter', 'Segoe UI', 'Arial', 'sans-serif'],
+        mono: ['Cascadia Code', 'SFMono-Regular', 'Consolas', 'monospace']
+      },
       colors: {
+        indigo: {
+          50: '#E6F1F8',
+          100: '#D3E7F3',
+          200: '#B6D8EA',
+          300: '#91C4DE',
+          400: '#63B4E6',
+          500: '#2F91C7',
+          600: '#006DB3',
+          700: '#075B91',
+          800: '#063753',
+          900: '#082C43',
+          950: '#061F30'
+        },
         tolaria: {
           bg: '#0B0F17',
           surface: '#111827',

@@ -1,4 +1,5 @@
 import React, { memo } from 'react'
+import { CheckCircle2, Clock, Cog, Plus } from 'lucide-react'
 import { TableRow, TableCell } from '../ui/table'
 import Badge from '../ui/badge'
 import PriorityBadge from './PriorityBadge'
@@ -22,7 +23,13 @@ export const TaskRowItem = memo(({ task, idx, groupId, onToggleCompleted, groupC
       {/* Task Name */}
       <TableCell className="font-medium text-slate-800 dark:text-slate-100">
         <div className="flex items-center gap-2 min-w-0">
-          <span className="text-sm shrink-0">{task.icon || '⚙️'}</span>
+          {task.completed || task.docStatus === 2 ? (
+            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+          ) : task.docStatus === 1 ? (
+            <Clock className="w-3.5 h-3.5 text-purple-500 shrink-0" />
+          ) : (
+            <Cog className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+          )}
           <span className={`truncate ${task.completed ? 'line-through text-slate-400' : ''}`}>
             {task.name}
           </span>
@@ -48,7 +55,7 @@ export const TaskRowItem = memo(({ task, idx, groupId, onToggleCompleted, groupC
 
       {/* Action Plus */}
       <TableCell className="text-center text-slate-300 dark:text-slate-700 group-hover:text-slate-500 cursor-pointer w-10">
-        +
+        <Plus className="w-3.5 h-3.5 mx-auto" />
       </TableCell>
     </TableRow>
   )

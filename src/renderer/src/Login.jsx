@@ -58,19 +58,19 @@ const Login = ({ onLoginSuccess }) => {
     >
       {/* Top Header / Window Controls */}
       <div 
-        className="flex h-8 items-center justify-between px-3 border-b border-slate-200 shrink-0 select-none app-region-drag"
+        className="flex h-8 items-center justify-between pl-3 pr-0 border-b border-slate-200 shrink-0 select-none app-region-drag"
         style={{ WebkitAppRegion: 'drag' }}
       >
         <span className="text-[11px] font-bold tracking-wider text-slate-600 uppercase app-region-no-drag">
           ERPSYS
         </span>
 
-        <div className="flex items-center">
+        <div className="flex items-stretch h-full space-x-0 app-region-no-drag">
           <button
             type="button"
             title="Cài đặt kết nối"
             onClick={handleOpenSettingsWindow}
-            className="flex h-7 w-7 items-center justify-center text-slate-500 hover:bg-slate-100 hover:text-slate-900 transition rounded-none cursor-pointer"
+            className="flex h-full w-9 items-center justify-center text-slate-500 hover:bg-slate-100 hover:text-slate-900 transition-colors rounded-none cursor-pointer"
           >
             <Settings size={13} />
           </button>
@@ -78,7 +78,7 @@ const Login = ({ onLoginSuccess }) => {
             type="button"
             title="Thu nhỏ"
             onClick={() => requestWindowAction('minimize')}
-            className="flex h-7 w-7 items-center justify-center text-slate-500 hover:bg-slate-100 hover:text-slate-900 transition rounded-none cursor-pointer"
+            className="flex h-full w-11 items-center justify-center text-slate-500 hover:bg-slate-100 hover:text-slate-900 transition-colors rounded-none cursor-pointer"
           >
             <Minus size={13} />
           </button>
@@ -86,7 +86,7 @@ const Login = ({ onLoginSuccess }) => {
             type="button"
             title="Đóng"
             onClick={() => requestWindowAction('close')}
-            className="flex h-7 w-8 items-center justify-center text-slate-500 hover:bg-rose-600 hover:text-white transition rounded-none cursor-pointer"
+            className="flex h-full w-12 items-center justify-center text-slate-500 hover:bg-rose-600 hover:text-white transition-colors rounded-none cursor-pointer"
           >
             <X size={13} />
           </button>

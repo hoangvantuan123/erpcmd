@@ -1,34 +1,40 @@
 import React from 'react'
-import { Home, Bell } from 'lucide-react'
+import { LayoutDashboard, Terminal, Bell } from 'lucide-react'
 
 const SidebarQuickAccess = ({ activeItem, onSelectItem }) => {
-  return (
-    <div className="space-y-0.5">
-      <button
-        onClick={() => onSelectItem('home')}
-        className={`w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-md text-left transition-all ${
-          activeItem === 'home' 
-            ? 'bg-slate-200/90 dark:bg-slate-800 text-slate-900 dark:text-slate-100 font-semibold' 
-            : 'hover:bg-slate-200/60 dark:hover:bg-slate-800/60 text-slate-700 dark:text-slate-300 font-medium'
-        }`}
-      >
-        <Home className="w-4 h-4 text-slate-600 dark:text-slate-400 shrink-0" />
-        <span>Home</span>
-      </button>
+  const items = [
+    { id: 'home', label: 'Overview', icon: LayoutDashboard },
+    { id: 'settle-logs', label: 'Nhật ký', icon: Terminal },
+    { id: 'notifications', label: 'Thông báo', icon: Bell }
+  ]
 
-      <button
-        onClick={() => onSelectItem('notifications')}
-        className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-md text-left transition-all ${
-          activeItem === 'notifications' 
-            ? 'bg-slate-200/90 dark:bg-slate-800 text-slate-900 dark:text-slate-100 font-semibold' 
-            : 'hover:bg-slate-200/60 dark:hover:bg-slate-800/60 text-slate-700 dark:text-slate-300 font-medium'
-        }`}
-      >
-        <div className="flex items-center gap-2.5">
-          <Bell className="w-4 h-4 text-slate-600 dark:text-slate-400 shrink-0" />
-          <span>Thông báo</span>
-        </div>
-      </button>
+  return (
+    <div className="space-y-1">
+      {/* Section Header: Workspace */}
+      <div className="px-2 pt-1 pb-1 text-[11px] font-medium text-zinc-400 dark:text-zinc-500 tracking-normal select-none">
+        Workspace
+      </div>
+
+      <div className="space-y-0.5">
+        {items.map((it) => {
+          const Icon = it.icon
+          const isActive = activeItem === it.id
+          return (
+            <button
+              key={it.id}
+              onClick={() => onSelectItem(it.id)}
+              className={`w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-md text-left transition-all text-xs cursor-pointer ${
+                isActive 
+                  ? 'bg-zinc-100 dark:bg-zinc-800/90 text-zinc-900 dark:text-zinc-100 font-semibold shadow-2xs' 
+                  : 'hover:bg-zinc-100/70 dark:hover:bg-zinc-800/40 text-zinc-600 dark:text-zinc-400 font-medium'
+              }`}
+            >
+              <Icon className={`w-3.5 h-3.5 shrink-0 ${isActive ? 'text-zinc-900 dark:text-zinc-100' : 'text-zinc-400 dark:text-zinc-500'}`} />
+              <span className="truncate">{it.label}</span>
+            </button>
+          )
+        })}
+      </div>
     </div>
   )
 }

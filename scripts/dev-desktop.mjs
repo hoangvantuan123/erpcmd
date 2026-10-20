@@ -1,12 +1,20 @@
 import { spawn } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import { dirname, resolve } from 'node:path'
+import { existsSync, mkdirSync, writeFileSync } from 'node:fs'
 
 const projectRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const viteCli = resolve(projectRoot, 'node_modules/vite/bin/vite.js')
 const devURL = 'http://127.0.0.1:5183'
 const children = []
 let shuttingDown = false
+
+// Đảm bảo thư mục frontend/dist có ít nhất 1 file để //go:embed không bị lỗi khi compile
+const distDir = resolve(projectRoot, 'cmd/desktop/frontend/dist')
+if (!existsSync(resolve(distDir, 'index.html'))) {
+  mkdirSync(distDir, { recursive: true })
+  writeFileSync(resolve(distDir, 'index.html'), '<!doctype html><html><body>ERPSYN Dev Mode</body></html>')
+}
 
 function start(command, args, env = process.env) {
   const child = spawn(command, args, {

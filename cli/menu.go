@@ -1683,7 +1683,7 @@ func (s *Shell) cmdDB() {
 	}
 
 	fmt.Println()
-	fmt.Printf("%s🗄️ Dữ liệu đã đồng bộ gần đây trong SQLite (%d):%s\n", colorBold, len(list), colorReset)
+	fmt.Printf("%sDữ liệu đã đồng bộ gần đây trong SQLite (%d):%s\n", colorBold, len(list), colorReset)
 	for _, item := range list {
 		fmt.Printf("● [#%d] [%s] ExtID: %s (%s)\n", item.ID, item.Category, item.ExternalID, item.SyncedAt.Format("15:04:05"))
 	}

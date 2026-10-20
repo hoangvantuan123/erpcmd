@@ -1,6 +1,6 @@
-import React, { useMemo } from 'react'
+import React, { useMemo, useEffect } from 'react'
 import { 
-  Star, CheckSquare, Code, Minus, Square, X
+  Minus, Square, X
 } from 'lucide-react'
 import { initialSpaces } from '../../data/spacesData'
 import SpaceViewCanvas from '../Spaces/SpaceViewCanvas'
@@ -9,21 +9,38 @@ import ApiLogsTableView from '../Logs/ApiLogsTableView'
 import SettleView from '../Settle/SettleView'
 import HomeView from '../Home/HomeView'
 import NotificationsView from '../Home/NotificationsView'
+import WindowResizeHandles from '../Common/WindowResizeHandles'
 
-const requestWindowAction = (action) => {
-  fetch(`/api/window/${action}`, { method: 'POST' }).catch(() => {
+const requestWindowAction = (action, winId = 'view') => {
+  fetch(`/api/window/${action}?win_id=${encodeURIComponent(winId)}`, { method: 'POST' }).catch(() => {
     if (action === 'close') window.close()
   })
 }
 
 export const StandaloneViewCanvas = ({ viewId = 'settle-process' }) => {
+  const winId = useMemo(() => {
+    return new URLSearchParams(window.location.search).get('win_id') || 'view'
+  }, [])
+
+  // Hỗ trợ Ctrl + Shift + N ngay trong Standalone Window
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'N' || e.key === 'n')) {
+        e.preventDefault()
+        fetch(`/api/window/new-view?view=${encodeURIComponent(viewId)}`, { method: 'POST' }).catch(() => {})
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [viewId])
+
   // Resolve nav info for viewId
   const navInfo = useMemo(() => {
     if (viewId === 'home') {
-      return { id: 'home', title: 'Home', parentTitle: 'Trang Chủ', type: 'home' }
+      return { id: 'home', title: 'Overview', parentTitle: null, type: 'home' }
     }
     if (viewId === 'notifications') {
-      return { id: 'notifications', title: 'Thông Báo', parentTitle: 'Hệ Thống', type: 'notifications' }
+      return { id: 'notifications', title: 'Thông Báo', parentTitle: null, type: 'notifications' }
     }
     if (viewId === 'settle-process' || viewId === 'all-tasks') {
       return {
@@ -44,8 +61,8 @@ export const StandaloneViewCanvas = ({ viewId = 'settle-process' }) => {
     if (viewId === 'settle-logs' || viewId === 'api-logs') {
       return {
         id: 'settle-logs',
-        title: 'Nhật ký quyết toán',
-        parentTitle: 'Quyết toán lệnh',
+        title: 'Nhật ký',
+        parentTitle: null,
         type: 'logs'
       }
     }
@@ -91,19 +108,25 @@ export const StandaloneViewCanvas = ({ viewId = 'settle-process' }) => {
 
   const isHomeView = navInfo.id === 'home' || navInfo.type === 'home'
   const isNotificationsView = navInfo.id === 'notifications' || navInfo.type === 'notifications'
-  const isSettleProcessView = navInfo.id === 'settle-process' || navInfo.type === 'settle-process'
+  const isSettleProcessView = navInfo.id === 'settle-process' || navInfo.type === 'settle-process' || navInfo.id === 'quyet-toan-lenh'
   const isSettleStepView = navInfo.id === 'settle-step' || navInfo.type === 'settle-step'
   const isLogsView = navInfo.id === 'settle-logs' || navInfo.type === 'logs'
-  const isSpaceView = navInfo.type === 'space' || navInfo.id === 'quyet-toan-lenh'
+  const isSpaceView = navInfo.type === 'space' && navInfo.id !== 'quyet-toan-lenh'
 
   return (
-    <div className="w-screen h-screen overflow-hidden flex flex-col font-sans select-none bg-white dark:bg-black text-slate-900 dark:text-neutral-200">
-      {/* Seamless Window Header for Standalone View */}
+    <div className="w-screen h-screen overflow-hidden flex flex-col font-sans select-none bg-white dark:bg-black text-slate-900 dark:text-neutral-200 relative">
+      <WindowResizeHandles winId={winId} />
+
       <header 
-        className="h-8 px-3 bg-white dark:bg-black border-b border-slate-200 dark:border-slate-800 shrink-0 flex items-center justify-between text-xs text-slate-600 dark:text-slate-400 select-none app-region-drag"
+        className="h-8 pl-3 pr-0 bg-white dark:bg-black border-b border-slate-200 dark:border-slate-800 shrink-0 flex items-center justify-between text-xs text-slate-600 dark:text-slate-400 select-none app-region-drag"
         onMouseDown={(e) => {
           if (e.button === 0 && !e.target.closest('button, input, select')) {
-            requestWindowAction('drag')
+            requestWindowAction('drag', winId)
+          }
+        }}
+        onDoubleClick={(e) => {
+          if (!e.target.closest('button, input, select')) {
+            requestWindowAction('maximize', winId)
           }
         }}
       >
@@ -120,42 +143,28 @@ export const StandaloneViewCanvas = ({ viewId = 'settle-process' }) => {
           <span className="font-bold text-slate-900 dark:text-slate-100 truncate">
             {navInfo.title}
           </span>
-          <span className="ml-2 text-[10px] font-mono px-1.5 py-0.2 bg-slate-100 dark:bg-slate-800 text-slate-500 rounded">
-            Standalone View
-          </span>
+       
         </div>
 
-        {/* Right: Window Controls */}
-        <div className="flex items-center space-x-1.5 text-slate-400 dark:text-slate-500 app-region-no-drag">
-          <button className="p-1 hover:bg-slate-100 dark:hover:bg-slate-800 rounded hover:text-amber-500 transition cursor-pointer" title="Star Favorite">
-            <Star className="w-3.5 h-3.5" />
-          </button>
-          <button className="p-1 hover:bg-slate-100 dark:hover:bg-slate-800 rounded hover:text-slate-700 dark:hover:text-slate-200 transition cursor-pointer" title="Check Task">
-            <CheckSquare className="w-3.5 h-3.5" />
-          </button>
-          <button className="p-1 hover:bg-slate-100 dark:hover:bg-slate-800 rounded hover:text-slate-700 dark:hover:text-slate-200 transition cursor-pointer" title="Code View">
-            <Code className="w-3.5 h-3.5" />
-          </button>
-
-          <div className="h-4 w-[1px] bg-slate-200 dark:bg-slate-800 mx-1" />
-
+        {/* Right: Window Controls - Flush, Seamless, No Rounded Corners */}
+        <div className="flex items-stretch h-full space-x-0 text-slate-400 dark:text-slate-500 app-region-no-drag">
           <button
-            onClick={() => requestWindowAction('minimize')}
-            className="p-1 hover:bg-slate-100 dark:hover:bg-slate-800 rounded hover:text-slate-800 dark:hover:text-white transition cursor-pointer"
+            onClick={() => requestWindowAction('minimize', winId)}
+            className="w-11 h-full flex items-center justify-center hover:bg-slate-100 dark:hover:bg-zinc-800 text-slate-500 hover:text-slate-900 dark:hover:text-white transition-colors cursor-pointer rounded-none"
             title="Thu nhỏ"
           >
             <Minus className="w-3.5 h-3.5" />
           </button>
           <button
-            onClick={() => requestWindowAction('maximize')}
-            className="p-1 hover:bg-slate-100 dark:hover:bg-slate-800 rounded hover:text-slate-800 dark:hover:text-white transition cursor-pointer"
-            title="Phóng to"
+            onClick={() => requestWindowAction('maximize', winId)}
+            className="w-11 h-full flex items-center justify-center hover:bg-slate-100 dark:hover:bg-zinc-800 text-slate-500 hover:text-slate-900 dark:hover:text-white transition-colors cursor-pointer rounded-none"
+            title="Phóng to / Khôi phục"
           >
             <Square className="w-3 h-3" />
           </button>
           <button
-            onClick={() => requestWindowAction('close')}
-            className="p-1 hover:bg-rose-600 hover:text-white rounded transition cursor-pointer"
+            onClick={() => requestWindowAction('close', winId)}
+            className="w-12 h-full flex items-center justify-center hover:bg-red-600 hover:text-white text-slate-500 transition-colors cursor-pointer rounded-none"
             title="Đóng cửa sổ"
           >
             <X className="w-3.5 h-3.5" />

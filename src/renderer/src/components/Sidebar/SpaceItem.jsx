@@ -1,5 +1,5 @@
 import React from 'react'
-import { ChevronDown, Users, Plus, Lock, Link2, MoreHorizontal } from 'lucide-react'
+import { ChevronDown, FolderOpenDot, Lock, Link2 } from 'lucide-react'
 import SpaceSubItem from './SpaceSubItem'
 
 const SpaceItem = ({ 
@@ -7,8 +7,7 @@ const SpaceItem = ({
   activeItem, 
   onSelectItem, 
   isExpanded, 
-  onToggleExpand,
-  onOpenContextMenu 
+  onToggleExpand
 }) => {
   const isSpaceActive = activeItem === space.id
 
@@ -29,60 +28,36 @@ const SpaceItem = ({
     <div className="space-y-0.5">
       <div 
         onClick={() => onSelectItem(space.id)}
-        className={`flex items-center justify-between px-2.5 py-1.5 rounded-md hover:bg-slate-200/60 dark:hover:bg-slate-800/60 cursor-pointer text-slate-800 dark:text-slate-200 font-medium transition-all group ${
-          isSpaceActive ? 'bg-slate-200/90 dark:bg-slate-800 font-semibold text-slate-900 dark:text-slate-100' : ''
+        className={`flex items-center justify-between px-2.5 py-1.5 rounded-md hover:bg-zinc-100/70 dark:hover:bg-zinc-800/40 cursor-pointer text-zinc-700 dark:text-zinc-300 font-medium transition-all text-xs group ${
+          isSpaceActive ? 'bg-zinc-100 dark:bg-zinc-800 font-semibold text-zinc-900 dark:text-zinc-100 shadow-2xs' : ''
         }`}
       >
         <div className="flex items-center gap-2 truncate flex-1 min-w-0">
           <ChevronDown 
             onClick={(e) => onToggleExpand(space.id, e)}
-            className={`w-3.5 h-3.5 text-slate-400 dark:text-slate-500 hover:text-slate-700 dark:hover:text-slate-200 transition-transform shrink-0 ${
+            className={`w-3.5 h-3.5 text-zinc-400 dark:text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-200 transition-transform shrink-0 ${
               isExpanded ? '' : '-rotate-90'
             }`} 
+            title={isExpanded ? 'Thu gọn' : 'Mở rộng'}
           />
-          <div className={`w-3.5 h-3.5 rounded ${space.iconColor || 'bg-indigo-600'} flex items-center justify-center text-white shrink-0 shadow-xs text-[9px] font-bold`}>
-            <Users className="w-2.5 h-2.5" />
+          <div className="   flex items-center justify-center text-zinc-700 ">
+            <FolderOpenDot className="w-4 h-4" />
           </div>
-          <span className="truncate font-semibold text-slate-800 dark:text-slate-200">
+          <span className="truncate font-semibold text-zinc-800 dark:text-zinc-200">
             {space.name}
           </span>
           {getPrivacyBadge()}
         </div>
-
-        <div className="flex items-center gap-0.5 shrink-0">
-          <button 
-            className="p-0.5 hover:bg-slate-300/50 dark:hover:bg-slate-700/50 rounded text-slate-500 dark:text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity" 
-            onClick={(e) => { 
-              e.stopPropagation()
-              onSelectItem(`${space.id}-add`)
-            }}
-            title="Thêm mục con"
-          >
-            <Plus className="w-3 h-3" />
-          </button>
-          
-          <button 
-            className="p-0.5 hover:bg-slate-300/50 dark:hover:bg-slate-700/50 rounded text-slate-500 dark:text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity" 
-            onClick={(e) => { 
-              e.stopPropagation()
-              onOpenContextMenu?.(e, space)
-            }}
-            title="Tùy chọn khác (...)"
-          >
-            <MoreHorizontal className="w-3 h-3" />
-          </button>
-        </div>
       </div>
 
       {isExpanded && space.subItems && space.subItems.length > 0 && (
-        <div className="ml-5 border-l border-slate-200 dark:border-slate-800 pl-2 space-y-0.5 mt-0.5">
+        <div className="ml-4 border-l border-zinc-200 dark:border-zinc-800 pl-1.5 space-y-0.5 mt-0.5">
           {space.subItems.map((sub) => (
             <SpaceSubItem
               key={sub.id}
               sub={sub}
               activeItem={activeItem}
               onSelectItem={onSelectItem}
-              onOpenContextMenu={onOpenContextMenu}
             />
           ))}
         </div>

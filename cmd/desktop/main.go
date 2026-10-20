@@ -163,11 +163,41 @@ func main() {
 		})
 	})
 
-	// GET /api/work-orders: Lấy danh sách Lệnh sản xuất thực tế từ Bravo ERP Explorer
+	// GET /api/work-orders: Lấy danh sách Lệnh sản xuất thực tế từ Bravo ERP Explorer hoặc SQLite Cache
 	mux.HandleFunc("GET /api/work-orders", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
+		cacheOnly := r.URL.Query().Get("cache_only") == "true"
+
+		if cacheOnly {
+			cachedOrders, err := database.GetWorkOrders()
+			if err == nil && len(cachedOrders) > 0 {
+				_ = json.NewEncoder(w).Encode(map[string]interface{}{
+					"success": true,
+					"data":    cachedOrders,
+					"total":   len(cachedOrders),
+					"latency": "0ms (SQLite Cache)",
+					"cached":  true,
+				})
+				return
+			}
+		}
+
 		orders, _, statusCode, latency, err := client.CallWorkOrdersAPI()
 		if err != nil {
+			// Fallback sang cache SQLite nếu mất mạng hoặc lỗi máy chủ
+			cachedOrders, errDb := database.GetWorkOrders()
+			if errDb == nil && len(cachedOrders) > 0 {
+				_ = json.NewEncoder(w).Encode(map[string]interface{}{
+					"success": true,
+					"data":    cachedOrders,
+					"total":   len(cachedOrders),
+					"latency": "SQLite Fallback",
+					"cached":  true,
+					"warning": "Không thể kết nối API trực tiếp, đang hiển thị dữ liệu đã lưu trong SQLite",
+				})
+				return
+			}
+
 			w.WriteHeader(http.StatusInternalServerError)
 			_ = json.NewEncoder(w).Encode(map[string]interface{}{
 				"success": false,
@@ -177,12 +207,64 @@ func main() {
 			})
 			return
 		}
+
+		// Lưu cache bất đồng bộ vào SQLite DB
+		if len(orders) > 0 {
+			go func(ords []db.WorkOrderRecord) {
+				_ = database.UpsertWorkOrders(ords)
+			}(orders)
+		}
+
 		_ = json.NewEncoder(w).Encode(map[string]interface{}{
 			"success": true,
 			"data":    orders,
 			"total":   len(orders),
 			"latency": latency.String(),
 		})
+	})
+
+	// GET /api/cache?key=... : Lấy cache query / bộ lọc từ SQLite
+	mux.HandleFunc("GET /api/cache", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json; charset=utf-8")
+		key := strings.TrimSpace(r.URL.Query().Get("key"))
+		if key == "" {
+			w.WriteHeader(http.StatusBadRequest)
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{"success": false, "error": "Thiếu tham số key"})
+			return
+		}
+		val, err := database.GetQueryCache(key)
+		if err != nil {
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{"success": false, "data": nil})
+			return
+		}
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{"success": true, "data": val})
+	})
+
+	// POST /api/cache : Lưu cache query / bộ lọc vào SQLite
+	mux.HandleFunc("POST /api/cache", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json; charset=utf-8")
+		var body struct {
+			Key   string `json:"key"`
+			Value string `json:"value"`
+		}
+		if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1024*1024)).Decode(&body); err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{"success": false, "error": "Dữ liệu JSON không hợp lệ"})
+			return
+		}
+		body.Key = strings.TrimSpace(body.Key)
+		if body.Key == "" {
+			w.WriteHeader(http.StatusBadRequest)
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{"success": false, "error": "Thiếu key"})
+			return
+		}
+		err := database.SetQueryCache(body.Key, body.Value)
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{"success": false, "error": err.Error()})
+			return
+		}
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{"success": true})
 	})
 
 	// GET /api/work-orders/details?stt=... : Lấy chi tiết công đoạn theo khóa STT
@@ -356,6 +438,32 @@ func main() {
 		_ = json.NewEncoder(w).Encode(map[string]interface{}{"success": true, "message": "Đã lưu cấu hình thành công"})
 	})
 
+	var (
+		winRegistryMu sync.RWMutex
+		winRegistry   = make(map[string]webview2.WebView)
+	)
+
+	registerWindow := func(id string, w webview2.WebView) {
+		winRegistryMu.Lock()
+		defer winRegistryMu.Unlock()
+		winRegistry[id] = w
+	}
+
+	unregisterWindow := func(id string) {
+		winRegistryMu.Lock()
+		defer winRegistryMu.Unlock()
+		delete(winRegistry, id)
+	}
+
+	getWindow := func(id string) webview2.WebView {
+		winRegistryMu.RLock()
+		defer winRegistryMu.RUnlock()
+		if id == "" {
+			id = "main"
+		}
+		return winRegistry[id]
+	}
+
 	mux.HandleFunc("POST /api/window/main", func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		if view == nil {
@@ -366,47 +474,105 @@ func main() {
 		view.Dispatch(func() { resizeAndCenter(view) })
 		_ = json.NewEncoder(w).Encode(map[string]bool{"success": true})
 	})
-	mux.HandleFunc("POST /api/window/minimize", func(w http.ResponseWriter, _ *http.Request) {
-		if view != nil {
-			view.Dispatch(func() {
+
+	mux.HandleFunc("POST /api/window/minimize", func(w http.ResponseWriter, r *http.Request) {
+		winID := r.URL.Query().Get("win_id")
+		target := getWindow(winID)
+		if target != nil {
+			target.Dispatch(func() {
 				showWindow := windows.NewLazySystemDLL("user32.dll").NewProc("ShowWindow")
 				const swMinimize = uintptr(6)
-				_, _, _ = showWindow.Call(uintptr(view.Window()), swMinimize)
+				_, _, _ = showWindow.Call(uintptr(target.Window()), swMinimize)
 			})
 		}
 		w.WriteHeader(http.StatusNoContent)
 	})
-	mux.HandleFunc("POST /api/window/close", func(w http.ResponseWriter, _ *http.Request) {
-		if view != nil {
-			view.Dispatch(func() { view.Destroy() })
+
+	mux.HandleFunc("POST /api/window/close", func(w http.ResponseWriter, r *http.Request) {
+		winID := strings.TrimSpace(r.URL.Query().Get("win_id"))
+		if winID == "" || winID == "main" {
+			if view != nil {
+				view.Dispatch(func() { view.Destroy() })
+			}
+		} else {
+			target := getWindow(winID)
+			if target != nil {
+				unregisterWindow(winID)
+				target.Dispatch(func() { target.Destroy() })
+			}
 		}
 		w.WriteHeader(http.StatusNoContent)
 	})
-	mux.HandleFunc("POST /api/window/maximize", func(w http.ResponseWriter, _ *http.Request) {
-		if view != nil {
-			view.Dispatch(func() {
+
+	mux.HandleFunc("POST /api/window/maximize", func(w http.ResponseWriter, r *http.Request) {
+		winID := r.URL.Query().Get("win_id")
+		target := getWindow(winID)
+		if target != nil {
+			target.Dispatch(func() {
 				user32 := windows.NewLazySystemDLL("user32.dll")
 				isZoomed := user32.NewProc("IsZoomed")
 				showWindow := user32.NewProc("ShowWindow")
-				res, _, _ := isZoomed.Call(uintptr(view.Window()))
+				res, _, _ := isZoomed.Call(uintptr(target.Window()))
 				if res != 0 {
-					showWindow.Call(uintptr(view.Window()), 9) // SW_RESTORE
+					showWindow.Call(uintptr(target.Window()), 9) // SW_RESTORE
 				} else {
-					showWindow.Call(uintptr(view.Window()), 3) // SW_MAXIMIZE
+					showWindow.Call(uintptr(target.Window()), 3) // SW_MAXIMIZE
 				}
 			})
 		}
 		w.WriteHeader(http.StatusNoContent)
 	})
-	mux.HandleFunc("POST /api/window/drag", func(w http.ResponseWriter, _ *http.Request) {
-		if view != nil {
-			view.Dispatch(func() {
+
+	mux.HandleFunc("POST /api/window/drag", func(w http.ResponseWriter, r *http.Request) {
+		winID := r.URL.Query().Get("win_id")
+		target := getWindow(winID)
+		if target != nil {
+			target.Dispatch(func() {
 				user32 := windows.NewLazySystemDLL("user32.dll")
 				releaseCapture := user32.NewProc("ReleaseCapture")
 				postMessage := user32.NewProc("PostMessageW")
 				const wmNCLButtonDown, htCaption = uintptr(0x00A1), uintptr(2)
 				_, _, _ = releaseCapture.Call()
-				_, _, _ = postMessage.Call(uintptr(view.Window()), wmNCLButtonDown, htCaption, 0)
+				_, _, _ = postMessage.Call(uintptr(target.Window()), wmNCLButtonDown, htCaption, 0)
+			})
+		}
+		w.WriteHeader(http.StatusNoContent)
+	})
+
+	mux.HandleFunc("POST /api/window/resize-edge", func(w http.ResponseWriter, r *http.Request) {
+		winID := r.URL.Query().Get("win_id")
+		edge := strings.ToLower(strings.TrimSpace(r.URL.Query().Get("edge")))
+		target := getWindow(winID)
+		if target != nil {
+			var htCode uintptr
+			switch edge {
+			case "left":
+				htCode = 10 // HTLEFT
+			case "right":
+				htCode = 11 // HTRIGHT
+			case "top":
+				htCode = 12 // HTTOP
+			case "top-left":
+				htCode = 13 // HTTOPLEFT
+			case "top-right":
+				htCode = 14 // HTTOPRIGHT
+			case "bottom":
+				htCode = 15 // HTBOTTOM
+			case "bottom-left":
+				htCode = 16 // HTBOTTOMLEFT
+			case "bottom-right":
+				htCode = 17 // HTBOTTOMRIGHT
+			default:
+				w.WriteHeader(http.StatusBadRequest)
+				return
+			}
+			target.Dispatch(func() {
+				user32 := windows.NewLazySystemDLL("user32.dll")
+				releaseCapture := user32.NewProc("ReleaseCapture")
+				postMessage := user32.NewProc("PostMessageW")
+				const wmNCLButtonDown = uintptr(0x00A1)
+				_, _, _ = releaseCapture.Call()
+				_, _, _ = postMessage.Call(uintptr(target.Window()), wmNCLButtonDown, htCode, 0)
 			})
 		}
 		w.WriteHeader(http.StatusNoContent)
@@ -431,9 +597,9 @@ func main() {
 		}
 		settingsWinLock.Unlock()
 
-		settingsURL := fmt.Sprintf("http://%s/?window=settings", listener.Addr().String())
+		settingsURL := fmt.Sprintf("http://%s/?window=settings&win_id=settings", listener.Addr().String())
 		if devURL != "" {
-			settingsURL = fmt.Sprintf("%s/?window=settings", devURL)
+			settingsURL = fmt.Sprintf("%s/?window=settings&win_id=settings", devURL)
 		}
 
 		go func() {
@@ -441,9 +607,9 @@ func main() {
 			defer runtime.UnlockOSThread()
 
 			subWin := webview2.NewWithOptions(webview2.WebViewOptions{
-				Debug:     devURL != "",
+				Debug:     true,
 				AutoFocus: true,
-				DataPath:  filepath.Join(dataDir, "webview_settings"),
+				DataPath:  filepath.Join(dataDir, "webview"),
 				WindowOptions: webview2.WindowOptions{
 					Title:  "ERPSYS — Cài Đặt Hệ Thống",
 					Width:  700,
@@ -459,14 +625,17 @@ func main() {
 			settingsWinLock.Lock()
 			settingsWin = subWin
 			settingsWinLock.Unlock()
+			registerWindow("settings", subWin)
 
 			defer func() {
 				settingsWinLock.Lock()
 				settingsWin = nil
 				settingsWinLock.Unlock()
+				unregisterWindow("settings")
 				subWin.Destroy()
 			}()
 
+			setStandardWindowFrame(subWin)
 			subWin.Navigate(settingsURL)
 			subWin.Run()
 		}()
@@ -500,9 +669,10 @@ func main() {
 		c := newViewCount
 		newViewMu.Unlock()
 
-		targetURL := fmt.Sprintf("http://%s/?window=view&view=%s", listener.Addr().String(), url.QueryEscape(viewParam))
+		winID := fmt.Sprintf("view_%d", c)
+		targetURL := fmt.Sprintf("http://%s/?window=view&view=%s&win_id=%s", listener.Addr().String(), url.QueryEscape(viewParam), winID)
 		if devURL != "" {
-			targetURL = fmt.Sprintf("%s/?window=view&view=%s", devURL, url.QueryEscape(viewParam))
+			targetURL = fmt.Sprintf("%s/?window=view&view=%s&win_id=%s", devURL, url.QueryEscape(viewParam), winID)
 		}
 
 		go func() {
@@ -510,9 +680,9 @@ func main() {
 			defer runtime.UnlockOSThread()
 
 			viewWin := webview2.NewWithOptions(webview2.WebViewOptions{
-				Debug:     devURL != "",
+				Debug:     true,
 				AutoFocus: true,
-				DataPath:  filepath.Join(dataDir, fmt.Sprintf("webview_view_%d", c)),
+				DataPath:  filepath.Join(dataDir, "webview"),
 				WindowOptions: webview2.WindowOptions{
 					Title:  fmt.Sprintf("ERPSYS — %s", viewParam),
 					Width:  1200,
@@ -524,9 +694,15 @@ func main() {
 				log.Printf("Không thể khởi tạo cửa sổ view độc lập")
 				return
 			}
-			defer viewWin.Destroy()
+			registerWindow(winID, viewWin)
+			defer func() {
+				unregisterWindow(winID)
+				viewWin.Destroy()
+			}()
 			setStandardWindowFrame(viewWin)
 			viewWin.Navigate(targetURL)
+			hwnd := uintptr(viewWin.Window())
+			user32.NewProc("ShowWindow").Call(hwnd, 5)
 			viewWin.Run()
 		}()
 
@@ -553,7 +729,7 @@ func main() {
 	}
 
 	view = webview2.NewWithOptions(webview2.WebViewOptions{
-		Debug:     devURL != "",
+		Debug:     true,
 		AutoFocus: true,
 		DataPath:  filepath.Join(dataDir, "webview"),
 		WindowOptions: webview2.WindowOptions{
@@ -566,11 +742,23 @@ func main() {
 	if view == nil {
 		log.Fatal("Không khởi chạy được WebView2. Cài Microsoft Edge WebView2 Runtime rồi mở lại ERPSYN.")
 	}
-	defer view.Destroy()
-	setStandardWindowFrame(view)
+	registerWindow("main", view)
+	defer func() {
+		unregisterWindow("main")
+		view.Destroy()
+	}()
+
 	if isTokenValid {
+		setStandardWindowFrame(view)
 		resizeAndCenter(view)
+	} else {
+		setLoginWindowFrame(view)
 	}
+
+	hwnd := uintptr(view.Window())
+	user32.NewProc("ShowWindow").Call(hwnd, 5)
+	user32.NewProc("SetForegroundWindow").Call(hwnd)
+
 	if devURL != "" {
 		log.Printf("Đang đợi Vite tại %s…", devURL)
 		if err := waitForDevServer(devURL, 60*time.Second); err != nil {
@@ -580,9 +768,6 @@ func main() {
 	} else {
 		view.Navigate("http://" + listener.Addr().String())
 	}
-	hwnd := uintptr(view.Window())
-	user32.NewProc("ShowWindow").Call(hwnd, 5)
-	user32.NewProc("SetForegroundWindow").Call(hwnd)
 	log.Print("Cửa sổ desktop đã mở")
 	view.Run()
 }
@@ -606,8 +791,8 @@ func waitForDevServer(url string, timeout time.Duration) error {
 func resizeAndCenter(view webview2.WebView) {
 	const width, height = 1366, 800
 	view.SetTitle("ERPSYS — Hệ thống điều hành sản xuất")
-	view.SetSize(width, height, webview2.HintNone)
 	setStandardWindowFrame(view)
+	view.SetSize(width, height, webview2.HintNone)
 
 	getSystemMetrics := windows.NewLazySystemDLL("user32.dll").NewProc("GetSystemMetrics")
 	setWindowPos := windows.NewLazySystemDLL("user32.dll").NewProc("SetWindowPos")
@@ -626,22 +811,145 @@ func resizeAndCenter(view webview2.WebView) {
 	_, _, _ = setWindowPos.Call(uintptr(view.Window()), 0, uintptr(x), uintptr(y), actualWidth, actualHeight, swpNoZOrder)
 }
 
+type winRect struct {
+	Left, Top, Right, Bottom int32
+}
+
+type winMonitorInfo struct {
+	CbSize    uint32
+	RcMonitor winRect
+	RcWork    winRect
+	DwFlags   uint32
+}
+
+type winNCCalcSizeParams struct {
+	Rgrc  [3]winRect
+	Lppos uintptr
+}
+
+type winPoint struct {
+	X, Y int32
+}
+
+type winMinMaxInfo struct {
+	PtReserved     winPoint
+	PtMaxSize      winPoint
+	PtMaxPosition  winPoint
+	PtMinTrackSize winPoint
+	PtMaxTrackSize winPoint
+}
+
 var (
 	prevWndProc           uintptr
 	customWndProcCallback uintptr
 )
 
 func customSubclassProc(hwnd uintptr, msg uint32, wParam, lParam uintptr) uintptr {
-	const wmNcCalcSize = 0x0083
+	const (
+		wmNcCalcSize    = 0x0083
+		wmGetMinMaxInfo = 0x0024
+	)
+
+	user32 := windows.NewLazySystemDLL("user32.dll")
+
+	// 1. WM_GETMINMAXINFO: Giới hạn kích thước maximize chuẩn xác theo WorkArea của Monitor
+	if msg == wmGetMinMaxInfo {
+		monitorFromWindow := user32.NewProc("MonitorFromWindow")
+		getMonitorInfo := user32.NewProc("GetMonitorInfoW")
+		hMon, _, _ := monitorFromWindow.Call(hwnd, 2) // 2 = MONITOR_DEFAULTTONEAREST
+		if hMon != 0 {
+			var mi winMonitorInfo
+			mi.CbSize = uint32(unsafe.Sizeof(mi))
+			r1, _, _ := getMonitorInfo.Call(hMon, uintptr(unsafe.Pointer(&mi)))
+			if r1 != 0 {
+				rtlMoveMemory := windows.NewLazySystemDLL("kernel32.dll").NewProc("RtlMoveMemory")
+				var mmi winMinMaxInfo
+				rtlMoveMemory.Call(uintptr(unsafe.Pointer(&mmi)), lParam, unsafe.Sizeof(mmi))
+				mmi.PtMaxPosition.X = mi.RcWork.Left - mi.RcMonitor.Left
+				mmi.PtMaxPosition.Y = mi.RcWork.Top - mi.RcMonitor.Top
+				mmi.PtMaxSize.X = mi.RcWork.Right - mi.RcWork.Left
+				mmi.PtMaxSize.Y = mi.RcWork.Bottom - mi.RcWork.Top
+				rtlMoveMemory.Call(lParam, uintptr(unsafe.Pointer(&mmi)), unsafe.Sizeof(mmi))
+				return 0
+			}
+		}
+	}
+
+	// 2. WM_NCCALCSIZE: Khắc phục lỗi Windows phóng to tràn ra ngoài 8px
 	if msg == wmNcCalcSize {
-		// Returning 0 on WM_NCCALCSIZE indicates that the client area occupies
-		// the entire window frame with 0 non-client title bar space.
+		if wParam != 0 {
+			isZoomed := user32.NewProc("IsZoomed")
+			res, _, _ := isZoomed.Call(hwnd)
+			if res != 0 {
+				monitorFromWindow := user32.NewProc("MonitorFromWindow")
+				getMonitorInfo := user32.NewProc("GetMonitorInfoW")
+				hMon, _, _ := monitorFromWindow.Call(hwnd, 2)
+				if hMon != 0 {
+					var mi winMonitorInfo
+					mi.CbSize = uint32(unsafe.Sizeof(mi))
+					r1, _, _ := getMonitorInfo.Call(hMon, uintptr(unsafe.Pointer(&mi)))
+					if r1 != 0 {
+						rtlMoveMemory := windows.NewLazySystemDLL("kernel32.dll").NewProc("RtlMoveMemory")
+						var params winNCCalcSizeParams
+						rtlMoveMemory.Call(uintptr(unsafe.Pointer(&params)), lParam, unsafe.Sizeof(params))
+						params.Rgrc[0] = mi.RcWork
+						rtlMoveMemory.Call(lParam, uintptr(unsafe.Pointer(&params)), unsafe.Sizeof(params))
+						return 0
+					}
+				}
+			}
+		}
+		// Returning 0 indicates client area occupies the whole window frame
 		return 0
 	}
-	user32 := windows.NewLazySystemDLL("user32.dll")
+
 	callWindowProc := user32.NewProc("CallWindowProcW")
 	ret, _, _ := callWindowProc.Call(prevWndProc, hwnd, uintptr(msg), wParam, lParam)
 	return ret
+}
+
+func setLoginWindowFrame(view webview2.WebView) {
+	user32 := windows.NewLazySystemDLL("user32.dll")
+	getWindowLongPtr := user32.NewProc("GetWindowLongPtrW")
+	setWindowLongPtr := user32.NewProc("SetWindowLongPtrW")
+	setWindowPos := user32.NewProc("SetWindowPos")
+	hwnd := uintptr(view.Window())
+	const (
+		gwlStyle        = ^uintptr(15) // -16
+		gwlpWndProc     = ^uintptr(3)  // -4
+		wsCaption       = uintptr(0x00C00000)
+		wsThickFrame    = uintptr(0x00040000)
+		wsMaximizeBox   = uintptr(0x00010000)
+		wsBorder        = uintptr(0x00800000)
+		wsDlgFrame      = uintptr(0x00400000)
+		swpFrameChanged = uintptr(0x0020)
+		swpNoMove       = uintptr(0x0002)
+		swpNoSize       = uintptr(0x0001)
+		swpNoZOrder     = uintptr(0x0004)
+	)
+
+	if customWndProcCallback == 0 {
+		customWndProcCallback = syscall.NewCallback(customSubclassProc)
+	}
+	oldProc, _, _ := setWindowLongPtr.Call(hwnd, gwlpWndProc, customWndProcCallback)
+	if oldProc != 0 && oldProc != customWndProcCallback {
+		prevWndProc = oldProc
+	}
+
+	// Login window: Bỏ caption, bỏ thickframe (không cho resize) và bỏ maximize box
+	style, _, _ := getWindowLongPtr.Call(hwnd, gwlStyle)
+	style &^= (wsCaption | wsBorder | wsDlgFrame | wsThickFrame | wsMaximizeBox)
+	_, _, _ = setWindowLongPtr.Call(hwnd, gwlStyle, style)
+
+	dwmapi := windows.NewLazySystemDLL("dwmapi.dll")
+	dwmExtendFrameIntoClientArea := dwmapi.NewProc("DwmExtendFrameIntoClientArea")
+	if dwmExtendFrameIntoClientArea.Find() == nil {
+		margins := struct{ cxLeftWidth, cxRightWidth, cyTopHeight, cyBottomHeight int32 }{1, 1, 1, 1}
+		_, _, _ = dwmExtendFrameIntoClientArea.Call(hwnd, uintptr(unsafe.Pointer(&margins)))
+	}
+
+	view.SetSize(460, 380, webview2.HintFixed)
+	_, _, _ = setWindowPos.Call(hwnd, 0, 0, 0, 0, 0, swpNoMove|swpNoSize|swpNoZOrder|swpFrameChanged)
 }
 
 func setStandardWindowFrame(view webview2.WebView) {

@@ -138,6 +138,12 @@ func InitDB(dbPath string) (*DB, error) {
 		quantity REAL,
 		synced_at DATETIME DEFAULT CURRENT_TIMESTAMP
 	);
+
+	CREATE TABLE IF NOT EXISTS user_query_cache (
+		key TEXT PRIMARY KEY,
+		value TEXT,
+		updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+	);
 	`
 
 	if _, err := conn.Exec(schema); err != nil {
@@ -445,3 +451,29 @@ func (d *DB) SetSettleEndpoint(stepKey, endpointURL, description string) error {
 	_, err := d.conn.Exec(query, stepKey, endpointURL, description)
 	return err
 }
+
+// Lưu giá trị bộ lọc hoặc cấu hình query vào SQLite user_query_cache
+func (d *DB) SetQueryCache(key, value string) error {
+	if d == nil || d.conn == nil {
+		return nil
+	}
+	query := `INSERT INTO user_query_cache (key, value, updated_at)
+	          VALUES (?, ?, CURRENT_TIMESTAMP)
+	          ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = CURRENT_TIMESTAMP`
+	_, err := d.conn.Exec(query, key, value)
+	return err
+}
+
+// Lấy giá trị bộ lọc hoặc cấu hình query từ SQLite user_query_cache
+func (d *DB) GetQueryCache(key string) (string, error) {
+	if d == nil || d.conn == nil {
+		return "", fmt.Errorf("CSDL chưa được khởi tạo")
+	}
+	var val string
+	err := d.conn.QueryRow(`SELECT value FROM user_query_cache WHERE key = ?`, key).Scan(&val)
+	if err != nil {
+		return "", err
+	}
+	return val, nil
+}
+

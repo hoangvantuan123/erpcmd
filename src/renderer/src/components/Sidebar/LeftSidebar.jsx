@@ -3,32 +3,16 @@ import { initialSpaces } from '../../data/spacesData'
 import SidebarCollapsed from './SidebarCollapsed'
 import SidebarHeader from './SidebarHeader'
 import SidebarQuickAccess from './SidebarQuickAccess'
-import SidebarDashboards from './SidebarDashboards'
-import SidebarMyTasks from './SidebarMyTasks'
 import SidebarSpaces from './SidebarSpaces'
-import CreateSpaceModal from './CreateSpaceModal'
-import SpaceContextMenu from './SpaceContextMenu'
-import SharePermissionsModal from './SharePermissionsModal'
 
 const LeftSidebar = ({ activeItem, onSelectItem, isCollapsed, onToggleCollapse }) => {
   const [sidebarWidth, setSidebarWidth] = useState(270)
   const [isResizing, setIsResizing] = useState(false)
-  const [spacesList, setSpacesList] = useState(initialSpaces)
+  const [spacesList] = useState(initialSpaces)
 
   // Track expanded spaces state by Space ID
   const [expandedSpaces, setExpandedSpaces] = useState({
     'quyet-toan-lenh': true
-  })
-
-  // Modal & Popup States
-  const [isCreateSpaceOpen, setIsCreateSpaceOpen] = useState(false)
-  const [isShareModalOpen, setIsShareModalOpen] = useState(false)
-  const [sharingTargetItem, setSharingTargetItem] = useState(null)
-  
-  const [contextMenu, setContextMenu] = useState({
-    isOpen: false,
-    position: { x: 0, y: 0 },
-    targetItem: null
   })
 
   const toggleSpaceExpand = (spaceId, e) => {
@@ -37,35 +21,6 @@ const LeftSidebar = ({ activeItem, onSelectItem, isCollapsed, onToggleCollapse }
       ...prev,
       [spaceId]: !prev[spaceId]
     }))
-  }
-
-  // Handle adding a new Space
-  const handleCreateSpace = (newSpace) => {
-    setSpacesList(prev => [newSpace, ...prev])
-    setExpandedSpaces(prev => ({
-      ...prev,
-      [newSpace.id]: true
-    }))
-  }
-
-  // Handle opening context menu on ... click
-  const handleOpenContextMenu = (e, targetItem) => {
-    const rect = e.currentTarget.getBoundingClientRect()
-    setContextMenu({
-      isOpen: true,
-      position: { x: rect.right + 5, y: rect.top },
-      targetItem
-    })
-  }
-
-  const handleCloseContextMenu = () => {
-    setContextMenu(prev => ({ ...prev, isOpen: false }))
-  }
-
-  // Handle opening sharing modal
-  const handleOpenSharingModal = (item) => {
-    setSharingTargetItem(item)
-    setIsShareModalOpen(true)
   }
 
   // Mouse Drag Handler for Resizing Sidebar Width (Min 180px, Max 450px)
@@ -107,7 +62,7 @@ const LeftSidebar = ({ activeItem, onSelectItem, isCollapsed, onToggleCollapse }
   return (
     <aside 
       style={{ width: `${sidebarWidth}px` }}
-      className={`h-full bg-white dark:bg-black border-r border-slate-200 dark:border-slate-800 flex flex-col text-[13px] text-slate-700 dark:text-slate-300 select-none shrink-0 relative ${
+      className={`h-full bg-zinc-50/50 dark:bg-zinc-950 border-r border-zinc-200 dark:border-zinc-800 flex flex-col text-[13px] text-zinc-700 dark:text-zinc-300 select-none shrink-0 relative ${
         isResizing ? '' : ''
       }`}
     >
@@ -117,7 +72,7 @@ const LeftSidebar = ({ activeItem, onSelectItem, isCollapsed, onToggleCollapse }
         isMac={isMac} 
       />
 
-      {/* 2. Fixed Top Section: Home & Thông báo */}
+      {/* 2. Fixed Top Section: Workspace */}
       <div className="p-2.5 shrink-0">
         <SidebarQuickAccess 
           activeItem={activeItem} 
@@ -125,7 +80,7 @@ const LeftSidebar = ({ activeItem, onSelectItem, isCollapsed, onToggleCollapse }
         />
       </div>
 
-      <hr className="border-slate-200 dark:border-slate-800 mx-2.5 my-1 shrink-0" />
+      <hr className="border-zinc-200 dark:border-zinc-800 mx-2.5 my-1 shrink-0" />
 
       {/* 3. Bottom Section: Spaces & Dự án - SCROLLABLE */}
       <SidebarSpaces
@@ -134,8 +89,6 @@ const LeftSidebar = ({ activeItem, onSelectItem, isCollapsed, onToggleCollapse }
         onSelectItem={onSelectItem}
         expandedSpaces={expandedSpaces}
         onToggleExpandSpace={toggleSpaceExpand}
-        onOpenCreateSpaceModal={() => setIsCreateSpaceOpen(true)}
-        onOpenContextMenu={handleOpenContextMenu}
       />
 
       {/* 4. DRAG RESIZE HANDLE BAR */}
@@ -144,27 +97,6 @@ const LeftSidebar = ({ activeItem, onSelectItem, isCollapsed, onToggleCollapse }
         onDoubleClick={() => setSidebarWidth(270)}
         className="absolute top-0 right-0 w-1.5 h-full cursor-col-resize hover:bg-indigo-500/50 active:bg-indigo-600 transition-colors z-30 group"
         title="Kéo rê để thay đổi độ rộng Sidebar (Đúp chuột để khôi phục mặc định)"
-      />
-
-      {/* 5. MODALS & POPUPS */}
-      <CreateSpaceModal
-        isOpen={isCreateSpaceOpen}
-        onClose={() => setIsCreateSpaceOpen(false)}
-        onCreateSpace={handleCreateSpace}
-      />
-
-      <SpaceContextMenu
-        isOpen={contextMenu.isOpen}
-        position={contextMenu.position}
-        targetItem={contextMenu.targetItem}
-        onClose={handleCloseContextMenu}
-        onOpenSharing={handleOpenSharingModal}
-      />
-
-      <SharePermissionsModal
-        isOpen={isShareModalOpen}
-        onClose={() => setIsShareModalOpen(false)}
-        targetItem={sharingTargetItem}
       />
     </aside>
   )

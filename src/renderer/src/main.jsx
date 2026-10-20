@@ -1,9 +1,11 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import ReactDOM from 'react-dom/client'
 import App from './App'
 import Login from './Login'
 import SettingsWindow from './components/Config/SettingsWindow'
 import StandaloneViewCanvas from './components/Editor/StandaloneViewCanvas'
+import ErrorBoundary from './components/Common/ErrorBoundary'
+import DevConsoleModal from './components/Common/DevConsoleModal'
 import './index.css'
 
 const urlParams = new URLSearchParams(window.location.search)
@@ -15,7 +17,7 @@ const DesktopApp = () => {
     return localStorage.getItem('erpsyn-authenticated') === 'true'
   })
 
-  React.useEffect(() => {
+  useEffect(() => {
     // Check session validity with Go backend SQLite cache
     fetch('/api/status')
       .then((res) => res.json())
@@ -37,16 +39,39 @@ const DesktopApp = () => {
     : <Login onLoginSuccess={() => setAuthenticated(true)} />
 }
 
+const Root = () => {
+  const [showConsole, setShowConsole] = useState(false)
+
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      // Toggle DevConsole on F12 or Ctrl+Shift+I or Ctrl+`
+      if (e.key === 'F12' || ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'I' || e.key === 'i'))) {
+        e.preventDefault()
+        setShowConsole(prev => !prev)
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [])
+
+  return (
+    <ErrorBoundary>
+      {windowType === 'settings' ? (
+        <SettingsWindow />
+      ) : windowType === 'view' ? (
+        <StandaloneViewCanvas viewId={viewId} />
+      ) : (
+        <DesktopApp />
+      )}
+
+      {/* In-app developer console accessible via F12 anytime */}
+      <DevConsoleModal isOpen={showConsole} onClose={() => setShowConsole(false)} />
+    </ErrorBoundary>
+  )
+}
+
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
-    {windowType === 'settings' ? (
-      <SettingsWindow />
-    ) : windowType === 'view' ? (
-      <StandaloneViewCanvas viewId={viewId} />
-    ) : (
-      <DesktopApp />
-    )}
-  </React.StrictMode>,
+    <Root />
+  </React.StrictMode>
 )
-
-

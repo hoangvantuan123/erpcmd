@@ -3,6 +3,7 @@ import LeftSidebar from './components/Sidebar/LeftSidebar'
 import EditorCanvas from './components/Editor/EditorCanvas'
 import BottomStatusBar from './components/StatusBar/BottomStatusBar'
 import WindowHeader from './components/MenuBar/WindowHeader'
+import WindowResizeHandles from './components/Common/WindowResizeHandles'
 import { useSpaces } from './hooks/useSpaces'
 
 const App = () => {
@@ -58,9 +59,10 @@ const App = () => {
   }, [activeItem])
 
   return (
-    <div className={`h-screen w-screen overflow-hidden flex flex-col font-sans select-none ${
+    <div className={`h-screen w-screen overflow-hidden flex flex-col font-sans select-none relative ${
       isDarkMode ? 'dark bg-black text-neutral-200' : 'bg-white text-slate-900'
     }`}>
+      <WindowResizeHandles winId="main" />
       {/* Main Layout: Sidebar (Left) + Full Width Grid Workspace (Right) - Headers form one continuous seamless top bar */}
       <div className="flex-1 flex min-h-0 overflow-hidden relative">
         <LeftSidebar

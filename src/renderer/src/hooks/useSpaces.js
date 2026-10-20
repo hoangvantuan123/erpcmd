@@ -4,13 +4,13 @@ import { initialNotesData } from '../data/notesData'
 
 // Global Navigation Titles Map
 const NAVIGATION_NAMES = {
-  'home': { title: 'Home', parentTitle: 'Trang Chủ', type: 'home' },
-  'notifications': { title: 'Thông Báo', parentTitle: 'Hệ Thống', type: 'notifications' },
+  'home': { title: 'Overview', parentTitle: null, type: 'home' },
+  'notifications': { title: 'Thông Báo', parentTitle: null, type: 'notifications' },
+  'settle-logs': { title: 'Nhật ký', parentTitle: null, type: 'logs' },
+  'api-logs': { title: 'Nhật ký', parentTitle: null, type: 'logs' },
   'settle-process': { title: 'Quyết toán lệnh công đoạn', parentTitle: 'Quyết toán lệnh', type: 'settle-process' },
   'settle-step': { title: 'Quyết toán lệnh thao tác', parentTitle: 'Quyết toán lệnh', type: 'settle-step' },
-  'settle-logs': { title: 'Nhật ký quyết toán', parentTitle: 'Quyết toán lệnh', type: 'logs' },
-  'all-tasks': { title: 'Quyết toán lệnh công đoạn', parentTitle: 'Quyết toán lệnh', type: 'settle-process' },
-  'api-logs': { title: 'Nhật ký quyết toán', parentTitle: 'Quyết toán lệnh', type: 'logs' }
+  'all-tasks': { title: 'Quyết toán lệnh công đoạn', parentTitle: 'Quyết toán lệnh', type: 'settle-process' }
 }
 
 export const useSpaces = () => {

@@ -1,5 +1,5 @@
 import React, { memo } from 'react'
-import { Plus } from 'lucide-react'
+import { Plus, CheckCircle2, Clock, Cog } from 'lucide-react'
 import PriorityBadge from '../PriorityBadge'
 
 export const KanbanBoardView = memo(({ groups }) => {
@@ -28,7 +28,13 @@ export const KanbanBoardView = memo(({ groups }) => {
                 className="p-3 rounded-lg bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs hover:border-purple-300 dark:hover:border-purple-800 transition-all space-y-2"
               >
                 <div className="flex items-start gap-2">
-                  <span className="text-sm shrink-0">{task.icon || '⚙️'}</span>
+                  {task.completed || task.docStatus === 2 ? (
+                    <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
+                  ) : task.docStatus === 1 ? (
+                    <Clock className="w-4 h-4 text-purple-500 shrink-0 mt-0.5" />
+                  ) : (
+                    <Cog className="w-4 h-4 text-slate-400 shrink-0 mt-0.5" />
+                  )}
                   <h4 className="text-xs font-bold text-slate-800 dark:text-slate-100 leading-snug line-clamp-2">
                     {task.name}
                   </h4>

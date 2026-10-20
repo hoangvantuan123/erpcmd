@@ -1,7 +1,7 @@
 import React from 'react'
-import { FileText, ListTodo, Eye, MoreHorizontal, FileSpreadsheet, Calculator, Activity } from 'lucide-react'
+import { FileText, ListTodo, Eye, FileSpreadsheet, Calculator, Activity } from 'lucide-react'
 
-const SpaceSubItem = ({ sub, activeItem, onSelectItem, onOpenContextMenu }) => {
+const SpaceSubItem = ({ sub, activeItem, onSelectItem }) => {
   const isSubActive = activeItem === sub.id
   const permission = sub.accessControl?.defaultPermission
 
@@ -24,37 +24,24 @@ const SpaceSubItem = ({ sub, activeItem, onSelectItem, onOpenContextMenu }) => {
   return (
     <div
       onClick={() => onSelectItem(sub.id)}
-      className={`w-full flex items-center justify-between px-2 py-1 rounded-md text-left transition-all cursor-pointer group ${
+      className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-md text-left transition-all cursor-pointer text-xs group ${
         isSubActive 
-          ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-900 dark:text-emerald-300 font-semibold' 
-          : 'hover:bg-slate-200/60 dark:hover:bg-slate-800/60 text-slate-700 dark:text-slate-300 font-medium'
+          ? 'bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 font-semibold shadow-2xs' 
+          : 'hover:bg-zinc-100/70 dark:hover:bg-zinc-800/40 text-zinc-600 dark:text-zinc-400 font-medium'
       }`}
       title={permission ? `Permissions: ${permission.replace('_', ' ')}` : undefined}
     >
-      <div className="flex items-center gap-2 truncate flex-1 min-w-0">
-        {getSubIcon()}
+      <div className="flex items-center gap-2.5 truncate flex-1 min-w-0">
         <span className="truncate">{sub.name}</span>
       </div>
 
       <div className="flex items-center gap-1 shrink-0">
-        {permission === 'view_only' && (
-          <Eye className="w-3 h-3 text-slate-400" title="View only access" />
-        )}
+        
         {sub.count !== undefined && (
-          <span className="text-[10px] text-slate-400 dark:text-slate-500 font-medium px-1">
+          <span className="text-[10px] font-mono text-zinc-400 dark:text-zinc-500 font-medium px-1">
             {sub.count}
           </span>
         )}
-        <button
-          className="p-0.5 hover:bg-slate-300/50 dark:hover:bg-slate-700/50 rounded text-slate-500 dark:text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity"
-          onClick={(e) => {
-            e.stopPropagation()
-            onOpenContextMenu?.(e, sub)
-          }}
-          title="Tùy chọn khác"
-        >
-          <MoreHorizontal className="w-3 h-3" />
-        </button>
       </div>
     </div>
   )

@@ -1,14 +1,72 @@
-import { useState, useCallback, useEffect, useMemo } from 'react'
+import { useState, useCallback, useEffect, useMemo, useRef } from 'react'
 
 export const useGroupedTasks = () => {
   const [orders, setOrders] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
-  const [searchTerm, setSearchTerm] = useState('')
+  const [latency, setLatency] = useState('')
   const [collapsedGroups, setCollapsedGroups] = useState({})
   const [selectedOrder, setSelectedOrder] = useState(null)
-  const [latency, setLatency] = useState('')
 
+  // Standard persistent query filters (matching ERP filter form layout)
+  const [filterFactory, setFilterFactory] = useState('')
+  const [filterDocNo, setFilterDocNo] = useState('')
+  const [dateFrom, setDateFrom] = useState('')
+  const [dateTo, setDateTo] = useState('')
+  const [filterStatus, setFilterStatus] = useState('') // '', '0', '1', '2'
+  const [filterCreatedBy, setFilterCreatedBy] = useState('')
+  const [filterProcess, setFilterProcess] = useState('')
+  const [filterItemCode, setFilterItemCode] = useState('')
+  const [searchTerm, setSearchTerm] = useState('')
+
+  // Dynamic filters generated via Ctrl + F on any column
+  // [{ id: 'itemName', title: 'Tên Sản Phẩm', value: '...' }]
+  const [dynamicFilters, setDynamicFilters] = useState([])
+  const isLoadedFromCache = useRef(false)
+
+  // 1. Load initial cache from SQLite (instant 0ms loading)
+  useEffect(() => {
+    // 1a. Load cached work orders first for instant UI paint
+    fetch('/api/work-orders?cache_only=true')
+      .then(res => res.json())
+      .then(json => {
+        if (json.success && Array.isArray(json.data) && json.data.length > 0) {
+          setOrders(json.data)
+          setLatency(json.latency || '0ms (SQLite Cache)')
+          setLoading(false)
+        }
+      })
+      .catch(() => {})
+
+    // 1b. Load query filter preferences from SQLite user_query_cache
+    fetch('/api/cache?key=work_orders_filters')
+      .then(res => res.json())
+      .then(json => {
+        if (json.success && json.data) {
+          try {
+            const saved = JSON.parse(json.data)
+            if (saved.filterFactory !== undefined) setFilterFactory(saved.filterFactory)
+            if (saved.filterDocNo !== undefined) setFilterDocNo(saved.filterDocNo)
+            if (saved.dateFrom !== undefined) setDateFrom(saved.dateFrom)
+            if (saved.dateTo !== undefined) setDateTo(saved.dateTo)
+            if (saved.filterStatus !== undefined) setFilterStatus(saved.filterStatus)
+            if (saved.filterCreatedBy !== undefined) setFilterCreatedBy(saved.filterCreatedBy)
+            if (saved.filterProcess !== undefined) setFilterProcess(saved.filterProcess)
+            if (saved.filterItemCode !== undefined) setFilterItemCode(saved.filterItemCode)
+            if (saved.searchTerm !== undefined) setSearchTerm(saved.searchTerm)
+            if (Array.isArray(saved.dynamicFilters)) setDynamicFilters(saved.dynamicFilters)
+          } catch {
+            // ignore JSON parse error
+          }
+        }
+        isLoadedFromCache.current = true
+      })
+      .catch(() => {
+        isLoadedFromCache.current = true
+      })
+  }, [])
+
+  // 2. Fetch fresh work orders from Bravo ERP Gateway
   const fetchWorkOrders = useCallback(async () => {
     setLoading(true)
     setError(null)
@@ -32,11 +90,213 @@ export const useGroupedTasks = () => {
     fetchWorkOrders()
   }, [fetchWorkOrders])
 
-  // Filter orders by search term
+  // 3. Persist query filter preferences into SQLite (Debounced)
+  useEffect(() => {
+    if (!isLoadedFromCache.current) return
+    const timer = setTimeout(() => {
+      const payload = {
+        filterFactory,
+        filterDocNo,
+        dateFrom,
+        dateTo,
+        filterStatus,
+        filterCreatedBy,
+        filterProcess,
+        filterItemCode,
+        searchTerm,
+        dynamicFilters
+      }
+      fetch('/api/cache', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          key: 'work_orders_filters',
+          value: JSON.stringify(payload)
+        })
+      }).catch(() => {})
+    }, 400)
+    return () => clearTimeout(timer)
+  }, [
+    filterFactory,
+    filterDocNo,
+    dateFrom,
+    dateTo,
+    filterStatus,
+    filterCreatedBy,
+    filterProcess,
+    filterItemCode,
+    searchTerm,
+    dynamicFilters
+  ])
+
+  // Extract unique filter lists
+  const uniqueProcesses = useMemo(() => {
+    const set = new Set()
+    orders.forEach(o => {
+      if (o.process_code) set.add(o.process_code.trim())
+    })
+    return Array.from(set).sort()
+  }, [orders])
+
+  const uniqueFactories = useMemo(() => {
+    const set = new Set()
+    orders.forEach(o => {
+      if (o.factory_name) set.add(o.factory_name.trim())
+    })
+    return Array.from(set).sort()
+  }, [orders])
+
+  // Dynamic filter helpers (Ctrl + F generator)
+  const addOrFocusDynamicFilter = useCallback((colId, colTitle, initialVal = '') => {
+    // If it is one of the standard fields, set it directly
+    if (colId === 'docNo') {
+      if (initialVal) setFilterDocNo(initialVal)
+      return { type: 'standard', id: 'filter-docNo' }
+    }
+    if (colId === 'processCode') {
+      if (initialVal) setFilterProcess(initialVal)
+      return { type: 'standard', id: 'filter-process' }
+    }
+    if (colId === 'factoryName') {
+      if (initialVal) setFilterFactory(initialVal)
+      return { type: 'standard', id: 'filter-factory' }
+    }
+    if (colId === 'createdByName') {
+      if (initialVal) setFilterCreatedBy(initialVal)
+      return { type: 'standard', id: 'filter-createdBy' }
+    }
+    if (colId === 'itemCode' || colId === 'itemName') {
+      if (initialVal) setFilterItemCode(initialVal)
+      return { type: 'standard', id: 'filter-itemCode' }
+    }
+    if (colId === 'status') {
+      return { type: 'standard', id: 'filter-status' }
+    }
+
+    // Otherwise, generate a dynamic filter entry
+    setDynamicFilters(prev => {
+      const idx = prev.findIndex(df => df.id === colId)
+      if (idx >= 0) {
+        if (initialVal) {
+          const next = [...prev]
+          next[idx] = { ...next[idx], value: initialVal }
+          return next
+        }
+        return prev
+      }
+      return [...prev, { id: colId, title: colTitle || colId, value: initialVal || '' }]
+    })
+
+    return { type: 'dynamic', id: `dyn-filter-${colId}` }
+  }, [])
+
+  const setDynamicFilterValue = useCallback((colId, value) => {
+    setDynamicFilters(prev => 
+      prev.map(df => df.id === colId ? { ...df, value } : df)
+    )
+  }, [])
+
+  const removeDynamicFilter = useCallback((colId) => {
+    setDynamicFilters(prev => prev.filter(df => df.id !== colId))
+  }, [])
+
+  const resetFilters = useCallback(() => {
+    setSearchTerm('')
+    setFilterProcess('')
+    setFilterFactory('')
+    setFilterDocNo('')
+    setFilterStatus('')
+    setFilterCreatedBy('')
+    setFilterItemCode('')
+    setDateFrom('')
+    setDateTo('')
+    setDynamicFilters([])
+  }, [])
+
+  // Filter orders by search term, grid fields and dynamic filters
   const filteredOrders = useMemo(() => {
-    if (!searchTerm.trim()) return orders
-    const term = searchTerm.toLowerCase().trim()
     return orders.filter(wo => {
+      // 1. Factory filter
+      if (filterFactory && wo.factory_name !== filterFactory) {
+        return false
+      }
+
+      // 2. DocNo filter
+      if (filterDocNo) {
+        const term = filterDocNo.toLowerCase().trim()
+        if (!wo.doc_no || !wo.doc_no.toLowerCase().includes(term)) return false
+      }
+
+      // 3. Process filter
+      if (filterProcess && wo.process_code !== filterProcess) {
+        return false
+      }
+
+      // 4. Status filter
+      if (filterStatus !== '') {
+        const s = Number(filterStatus)
+        if (wo.doc_status !== s) return false
+      }
+
+      // 5. Created by filter
+      if (filterCreatedBy) {
+        const term = filterCreatedBy.toLowerCase().trim()
+        if (!wo.created_by_name || !wo.created_by_name.toLowerCase().includes(term)) return false
+      }
+
+      // 6. Item code / Item name filter
+      if (filterItemCode) {
+        const term = filterItemCode.toLowerCase().trim()
+        const code = (wo.item_code || '').toLowerCase()
+        const name = (wo.item_name || '').toLowerCase()
+        if (!code.includes(term) && !name.includes(term)) return false
+      }
+
+      // 7. Date range filter (supports DD/MM/YYYY or YYYY-MM-DD)
+      if (dateFrom || dateTo) {
+        const rawDate = wo.doc_date || ''
+        let itemDateStr = ''
+        if (rawDate.includes('/')) {
+          const parts = rawDate.split('/')
+          if (parts.length === 3) {
+            itemDateStr = `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`
+          }
+        } else if (rawDate.length >= 10) {
+          itemDateStr = rawDate.substring(0, 10)
+        }
+
+        if (itemDateStr) {
+          if (dateFrom && itemDateStr < dateFrom) return false
+          if (dateTo && itemDateStr > dateTo) return false
+        }
+      }
+
+      // 8. Dynamic filters generated by Ctrl + F
+      for (const df of dynamicFilters) {
+        if (!df.value || !df.value.trim()) continue
+        const term = df.value.toLowerCase().trim()
+        let val = ''
+        switch (df.id) {
+          case 'stt': val = wo.stt || ''; break
+          case 'docDate': val = wo.doc_date || ''; break
+          case 'processCode': val = wo.process_code || ''; break
+          case 'itemCode': val = wo.item_code || ''; break
+          case 'itemName': val = wo.item_name || ''; break
+          case 'description': val = wo.description || ''; break
+          case 'quantity': val = String(wo.quantity || ''); break
+          case 'factoryName': val = wo.factory_name || ''; break
+          case 'createdByName': val = wo.created_by_name || ''; break
+          case 'status': val = wo.status_text || ''; break
+          default: val = String(wo[df.id] || '')
+        }
+        if (!val.toLowerCase().includes(term)) {
+          return false
+        }
+      }
+
+      // 9. Global Search term filter
+      if (!searchTerm.trim()) return true
+      const term = searchTerm.toLowerCase().trim()
       return (
         (wo.doc_no && wo.doc_no.toLowerCase().includes(term)) ||
         (wo.stt && wo.stt.toLowerCase().includes(term)) ||
@@ -48,7 +308,19 @@ export const useGroupedTasks = () => {
         (wo.process_code && wo.process_code.toLowerCase().includes(term))
       )
     })
-  }, [orders, searchTerm])
+  }, [
+    orders, 
+    filterFactory, 
+    filterDocNo, 
+    filterProcess, 
+    filterStatus, 
+    filterCreatedBy, 
+    filterItemCode, 
+    dateFrom, 
+    dateTo, 
+    dynamicFilters, 
+    searchTerm
+  ])
 
   // Format into ClickUp/Taskhub grouped structure for Glide Data Grid & views
   const groups = useMemo(() => {
@@ -75,7 +347,7 @@ export const useGroupedTasks = () => {
         dueDate: wo.doc_date || 'Today',
         priority: wo.doc_status === 1 ? 'High' : wo.doc_status === 2 ? 'Normal' : 'Low',
         completed: wo.doc_status === 2,
-        icon: wo.doc_status === 2 ? '🟢' : wo.doc_status === 1 ? '🟣' : '⚙️',
+        iconType: wo.doc_status === 2 ? 'completed' : wo.doc_status === 1 ? 'running' : 'pending',
         raw: wo
       }
 
@@ -141,6 +413,29 @@ export const useGroupedTasks = () => {
     refetch: fetchWorkOrders,
     searchTerm,
     setSearchTerm,
+    filterProcess,
+    setFilterProcess,
+    filterFactory,
+    setFilterFactory,
+    filterDocNo,
+    setFilterDocNo,
+    filterStatus,
+    setFilterStatus,
+    filterCreatedBy,
+    setFilterCreatedBy,
+    filterItemCode,
+    setFilterItemCode,
+    dateFrom,
+    setDateFrom,
+    dateTo,
+    setDateTo,
+    dynamicFilters,
+    setDynamicFilterValue,
+    removeDynamicFilter,
+    addOrFocusDynamicFilter,
+    resetFilters,
+    uniqueProcesses,
+    uniqueFactories,
     toggleGroup,
     toggleTaskCompleted,
     addTaskToGroup,
